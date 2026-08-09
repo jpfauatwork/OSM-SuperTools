@@ -60,13 +60,15 @@
     return out;
   }
 
-  // The selected building: a selected area path tagged building=yes.
+  // The selected building: a selected area path with any building=* tag
+  // (house, yes, apartments, …), excluding building=no (a mapped footprint
+  // explicitly marked as not a building).
   function selectedBuilding() {
     const surface = OST.getSurface();
     if (!surface) return null;
     for (const p of surface.querySelectorAll("path.area.selected")) {
       const e = OST.getEntity(p);
-      if (e && e.tags && e.tags.building === "yes") return { pathEl: p, entity: e };
+      if (e && e.tags && e.tags.building && e.tags.building !== "no") return { pathEl: p, entity: e };
     }
     return null;
   }
