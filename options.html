@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OSM SuperTools — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <h1>OSM SuperTools</h1>
+    <p class="ost-sub">A modular toolkit for the iD editor. Configure each module below, then press <strong>Save</strong>.</p>
+
+    <!-- ============================ QuickTagging ============================ -->
+    <section class="ost-module" id="module-quicktagging">
+      <h2 class="ost-module-title">QuickTagging</h2>
+      <p class="ost-module-desc">Buttons in the editor sidebar that apply one <strong>or several</strong> tags at once. Clicking a button overwrites the value of every key it sets on the selected feature.</p>
+
+      <div id="ost-buttons"></div>
+      <button type="button" id="ost-add-button" class="ost-btn ost-btn-secondary">+ Add button</button>
+    </section>
+
+    <!-- ============================ QuickFilters ============================ -->
+    <section class="ost-module" id="module-quickfilters">
+      <h2 class="ost-module-title">QuickFilters</h2>
+      <p class="ost-module-desc">Named filters you can toggle from the map controls (right side, funnel icon). Each highlights the currently loaded features that match its query, in a color you choose. Only features already loaded in the browser are queried — no network requests.</p>
+
+      <div id="ost-filters"></div>
+      <button type="button" id="ost-add-filter" class="ost-btn ost-btn-secondary">+ Add filter</button>
+    </section>
+
+    <div class="ost-actions">
+      <button type="button" id="ost-save" class="ost-btn ost-btn-primary">Save</button>
+      <span id="ost-saved" class="ost-saved"></span>
+    </div>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

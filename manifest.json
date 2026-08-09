@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "OSM SuperTools",
+  "version": "0.2.0",
+  "description": "A modular toolkit for the OpenStreetMap iD editor: QuickTagging (one-click tag sets) and QuickFilters (highlight loaded features by tag query).",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "osm-supertools@local.extension",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.openstreetmap.org/*",
+    "https://master.apis.dev.openstreetmap.org/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "action": {
+    "default_title": "OSM SuperTools",
+    "default_icon": {
+      "48": "icons/icon.svg"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.openstreetmap.org/id*",
+        "https://master.apis.dev.openstreetmap.org/id*"
+      ],
+      "all_frames": true,
+      "js": [
+        "modules/shared.js",
+        "modules/quicktagging.js",
+        "modules/quickfilters.js",
+        "modules/addressfill.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.openstreetmap.org/edit*",
+        "https://master.apis.dev.openstreetmap.org/edit*"
+      ],
+      "js": ["modules/topbar.js"],
+      "css": ["topbar.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

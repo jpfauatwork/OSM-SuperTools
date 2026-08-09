@@ -1,0 +1,23 @@
+#ost-topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#ost-topbar-btn svg {
+  display: block;
+  flex: none;
+}
+
+.ost-topbar-label {
+  line-height: 1;
+}
+
+/* Drop the label on narrow viewports so the header stays uncluttered;
+   the gear icon and tooltip still convey the button. */
+@media (max-width: 991.98px) {
+  .ost-topbar-label {
+    display: none;
+  }
+}

@@ -1,0 +1,255 @@
+#ost-panel {
+  margin: 0 0 10px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 6px;
+  overflow: hidden;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#ost-panel.ost-unplaced {
+  display: none;
+}
+
+#ost-panel .ost-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(128, 128, 128, 0.14);
+}
+
+#ost-panel .ost-title {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.8;
+}
+
+#ost-panel .ost-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+#ost-panel .ost-icon-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+
+#ost-panel .ost-icon-btn:hover {
+  background: rgba(128, 128, 128, 0.25);
+  opacity: 1;
+}
+
+#ost-panel .ost-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px;
+}
+
+#ost-panel.ost-collapsed .ost-body,
+#ost-panel.ost-collapsed .ost-status {
+  display: none;
+}
+
+#ost-panel .ost-tag-btn {
+  border: 1px solid var(--ost-color, #2b6cff);
+  background: var(--ost-bg, rgba(43, 108, 255, 0.18));
+  color: inherit;
+  border-radius: 5px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+#ost-panel .ost-tag-btn:hover:not(:disabled) {
+  background: var(--ost-bg-hover, rgba(43, 108, 255, 0.32));
+}
+
+#ost-panel .ost-tag-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#ost-panel .ost-empty {
+  opacity: 0.6;
+  font-style: italic;
+  padding: 2px;
+}
+
+#ost-panel .ost-status {
+  padding: 0 8px 7px;
+  min-height: 13px;
+  font-size: 11px;
+  color: #4caf72;
+}
+
+#ost-panel .ost-status.ost-error {
+  color: #e06c6c;
+}
+
+/* ===================================================================== */
+/* QuickFilters                                                           */
+/* ===================================================================== */
+
+/* Feature highlight — overrides iD's own stroke/fill via !important, tinted
+   per filter through the --ost-qf-color custom property set on the element. */
+.surface .ost-qf-match {
+  stroke: var(--ost-qf-color, #ff2d95) !important;
+  stroke-width: 5px !important;
+  stroke-opacity: 0.95 !important;
+}
+
+.surface path.area.ost-qf-match {
+  fill: var(--ost-qf-color, #ff2d95) !important;
+  fill-opacity: 0.25 !important;
+}
+
+.surface g.point.ost-qf-match path.stroke,
+.surface g.point.ost-qf-match circle,
+.surface g.vertex.ost-qf-match circle {
+  stroke: var(--ost-qf-color, #ff2d95) !important;
+  stroke-width: 4px !important;
+}
+
+/* Control button — iD's own `.map-control > button` (dark bg) and
+   `.icon.light` (white icon) rules already apply; center the icon in the
+   40x40 button like the native controls. */
+#ost-qf-control > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Pane: reuses iD's own `.layer-list` markup so the list is styled exactly
+   like the Background pane; these rules only add the color swatch, the match
+   count, and the swatch+name layout inside iD's label span. --- */
+
+.ost-qf-list {
+  margin-bottom: 10px;
+}
+
+/* iD makes `.layer-list > li` a flex row; keep our count vertically centered. */
+.ost-qf-list > li {
+  align-items: center;
+}
+
+/* iD's `label > span` is a single block; make ours lay out swatch + name. */
+.ost-qf-list label > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ost-qf-list label input[type="checkbox"] {
+  flex: none;
+  margin: 0 2px 0 0;
+}
+
+.ost-qf-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex: none;
+  border: 1px solid var(--border-color, #ccc);
+}
+
+.ost-qf-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ost-qf-count {
+  flex: none;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-text-color, #aaa);
+  font-size: 11px;
+  padding: 0 10px;
+  text-align: right;
+}
+
+.ost-qf-empty {
+  color: var(--muted-text-color, #aaa);
+  font-style: italic;
+  padding: 8px 10px;
+  display: block;
+}
+
+/* "Manage filters" — styled like iD's call-to-action buttons */
+.ost-qf-manage {
+  display: block;
+  width: 100%;
+  border: none;
+  background: var(--link-color, #7092ff);
+  color: #fff;
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ost-qf-manage:hover {
+  background: var(--link-focus-color, #597be7);
+}
+
+.ost-qf-pane .ost-qf-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-color, #333);
+  padding: 0 4px;
+}
+
+/* ===================================================================== */
+/* AddressFill                                                            */
+/* ===================================================================== */
+
+/* "fill" button inserted after the flex:1 `.label-text`, so it sits at the
+   right of the label just left of iD's trailing info button.
+   !important is needed to beat iD's high-specificity `.field-label button`
+   rules (fixed 32px width and a :not(:hover) background reset). */
+.field-label .ost-addr-fill {
+  margin: 4px 6px 4px 4px !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  border: 1px solid var(--link-color, #7092ff) !important;
+  border-radius: 3px !important;
+  background: var(--link-color, #7092ff) !important;
+  color: #fff !important;
+  padding: 1px 9px !important;
+  font-size: 11px !important;
+  font-weight: bold;
+  line-height: 1.6 !important;
+  cursor: pointer;
+}
+
+.field-label .ost-addr-fill:hover {
+  background: var(--link-focus-color, #597be7) !important;
+  border-color: var(--link-focus-color, #597be7) !important;
+}
+
+/* Address inputs showing a hover preview of the source point's values. */
+.ost-addr-hint::placeholder {
+  color: var(--link-color, #7092ff);
+  opacity: 0.9;
+  font-style: italic;
+}
+.ost-addr-hint {
+  box-shadow: inset 0 0 0 1px var(--link-color, #7092ff);
+}
