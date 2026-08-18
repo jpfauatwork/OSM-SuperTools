@@ -25,3 +25,17 @@ Firefox removes temporary add-ons on restart, so you'll need to reload it from `
 ## Configuration
 
 Click the gear icon next to the language button in the osm.org header (or the gear inside the QuickTagging panel) to open Settings, where you can add, edit, and remove QuickTagging buttons and QuickFilters. AddressFill needs no configuration.
+
+## Building a release
+
+Run `./build.sh` to package the extension into `web-ext-artifacts/osm-supertools-<version>.zip` (and a `.xpi` copy). The version comes from `manifest.json`. Load the `.xpi` via `about:debugging` on regular Firefox, or install it permanently on Firefox Developer Edition / Nightly with `xpinstall.signatures.required` set to `false` in `about:config`.
+
+### Publishing to GitHub Releases
+
+The `.github/workflows/release.yml` workflow builds the package and publishes a GitHub Release automatically. To cut a release:
+
+1. Bump `"version"` in `manifest.json` and commit.
+2. Tag it to match, e.g. `git tag v0.2.0`.
+3. Push the tag: `git push origin v0.2.0`.
+
+The workflow checks that the tag matches the manifest version, then attaches the `.xpi` and `.zip` to a new Release. You can also trigger it manually from the Actions tab against an existing tag.
