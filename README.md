@@ -10,6 +10,11 @@ Configurable buttons in the editor sidebar, just above the Tags section. Each bu
 ### QuickFilters
 Named, toggleable filters available from the map controls (funnel icon, next to Background/Map Data). Each filter highlights currently loaded features matching a tag query — geometry type, tags that must be present, tags that must not be present — in a color you choose. Only checks features already loaded in the browser, no extra network requests.
 
+### Overlays
+Upload a GPX or GeoJSON file and show it as a passive layer drawn on top of the map, available from the map controls (stacked-layers icon, next to QuickFilters). Each upload gets a checkbox to toggle it on/off and a color swatch, just like the QuickFilters list. The layer is purely visual and never intercepts clicks, so you can trace new geometry directly over it. Uploads persist across editor reloads; use the **×** next to an entry to remove it. GPX waypoints, routes, and track segments are supported, as are all standard GeoJSON geometry types.
+
+**Gradient view:** when a track carries elevation (GPX `<ele>` points), a **%** button appears next to it. Toggle it and the track is recoloured by slope instead of a single color: the track is split into short spans (~25 m, to smooth out GPS elevation noise) and each span is coloured by its grade in 5% steps — blue for downhill, red for uphill, deepening as it gets steeper. Spans of 5% or more also get a signed percentage label (e.g. `-12%`), and a color key appears under the list. Because each span is coloured in place, the color itself shows exactly which stretch a value refers to.
+
 ### AddressFill
 When you select a building that contains a point with address tags (e.g. a shop or POI mapped inside it), a **fill** button appears next to the Address field. Hovering previews the point's address in the address inputs; clicking copies all its `addr:*` tags onto the building.
 

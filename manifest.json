@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "OSM SuperTools",
   "version": "0.2.0",
-  "description": "A modular toolkit for the OpenStreetMap iD editor: QuickTagging (one-click tag sets) and QuickFilters (highlight loaded features by tag query).",
+  "description": "A modular toolkit for the OpenStreetMap iD editor: QuickTagging (one-click tag sets), QuickFilters (highlight loaded features by tag query), and Overlays (trace over an uploaded GPX/GeoJSON).",
   "browser_specific_settings": {
     "gecko": {
       "id": "osm-supertools@local.extension",
@@ -42,6 +42,7 @@
         "modules/shared.js",
         "modules/quicktagging.js",
         "modules/quickfilters.js",
+        "modules/overlays.js",
         "modules/addressfill.js"
       ],
       "css": ["content.css"],

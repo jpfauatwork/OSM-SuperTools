@@ -216,6 +216,241 @@
 }
 
 /* ===================================================================== */
+/* Overlays                                                              */
+/* ===================================================================== */
+
+/* The drawn layer is a passive tracing reference — never let it eat clicks
+   meant for the iD map underneath. */
+.surface .ost-ov-layer {
+  pointer-events: none;
+}
+
+#ost-ov-control > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pane list — reuses iD's `.layer-list` markup like QuickFilters does. */
+.ost-ov-list {
+  margin-bottom: 10px;
+}
+
+.ost-ov-list > li {
+  align-items: center;
+}
+
+.ost-ov-list label > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ost-ov-list label input[type="checkbox"] {
+  flex: none;
+  margin: 0 2px 0 0;
+}
+
+.ost-ov-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex: none;
+  border: 1px solid var(--border-color, #ccc);
+}
+
+.ost-ov-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Remove button. iD styles buttons inside its panes with high-specificity
+   rules (fixed width, its own padding), so — like AddressFill does for the
+   address field — we scope under the pane + list and use !important to win. */
+.ost-ov-pane .ost-ov-list .ost-ov-remove {
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+  padding: 4px 8px !important;
+  margin: 0 2px 0 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted-text-color, #aaa);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.ost-ov-pane .ost-ov-list .ost-ov-remove:hover {
+  color: #e06c6c;
+}
+
+/* Display-mode switch: a two-segment slider (plain line | slope %) with a blue
+   "thumb" that slides between the halves. We pin an explicit width and equal
+   50% halves with !important, so iD's own button width/max-width rules can't
+   clip the second option (which had hidden the "%" behind `overflow:hidden`). */
+.ost-ov-pane .ost-ov-list .ost-ov-mode {
+  position: relative;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  display: inline-flex !important;
+  box-sizing: border-box !important;
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+  height: auto !important;
+  align-items: stretch;
+  padding: 0 !important;
+  margin: 0 8px 0 6px !important;
+  border: 1px solid var(--border-color, #ccc) !important;
+  border-radius: 5px !important;
+  overflow: hidden;
+  background: transparent !important;
+  cursor: pointer;
+}
+
+.ost-ov-mode-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  background: var(--link-color, #7092ff);
+  transform: translateX(0);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+.ost-ov-mode.gradient .ost-ov-mode-thumb {
+  transform: translateX(100%);
+}
+
+.ost-ov-pane .ost-ov-list .ost-ov-mode .ost-ov-mode-opt {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 50% !important;
+  width: 50% !important;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0 !important;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted-text-color, #aaa);
+  transition: color 0.22s ease;
+}
+
+.ost-ov-mode-opt svg {
+  display: block;
+}
+
+/* The option sitting over the thumb reads white. */
+.ost-ov-mode.line .ost-ov-mode-line,
+.ost-ov-mode.gradient .ost-ov-mode-pct {
+  color: #fff;
+}
+
+/* Gradient colour legend — a single diverging bar, centred in the row with
+   generous breathing room above and below. iD makes `.layer-list > li` a flex
+   row and already draws the divider between items, so we add no border of our
+   own (that produced a second line) and just force this li to centre and pad. */
+.ost-ov-pane .ost-ov-list .ost-ov-legend {
+  display: flex !important;
+  box-sizing: border-box;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 16px 4px !important;
+}
+
+.ost-ov-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.ost-ov-legend-ramp {
+  display: inline-flex;
+  flex: none;
+}
+
+.ost-ov-legend-cell {
+  width: 10px;
+  height: 11px;
+  display: inline-block;
+}
+
+.ost-ov-legend-cell:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.ost-ov-legend-cell:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.ost-ov-legend-end {
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--muted-text-color, #aaa);
+}
+
+.ost-ov-empty {
+  color: var(--muted-text-color, #aaa);
+  font-style: italic;
+  padding: 8px 10px;
+  display: block;
+}
+
+/* "Upload…" — styled like iD's call-to-action buttons; the real <input> is
+   hidden and driven by clicking this label. */
+.ost-ov-upload {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  border: none;
+  background: var(--link-color, #7092ff);
+  color: #fff;
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ost-ov-upload:hover {
+  background: var(--link-focus-color, #597be7);
+}
+
+.ost-ov-status {
+  margin: 8px 0 0;
+  min-height: 13px;
+  font-size: 11px;
+  color: var(--muted-text-color, #aaa);
+}
+
+.ost-ov-status.ost-ov-error {
+  color: #e06c6c;
+}
+
+.ost-ov-pane .ost-ov-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-color, #333);
+  padding: 0 4px;
+}
+
+/* ===================================================================== */
 /* AddressFill                                                            */
 /* ===================================================================== */
 
