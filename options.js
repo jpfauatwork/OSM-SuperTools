@@ -16,8 +16,6 @@ function escapeAttr(str) {
   return String(str ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-/* ============================ QuickTagging ============================ */
-
 function normalizeButton(btn) {
   let tags;
   if (Array.isArray(btn.tags)) {
@@ -97,8 +95,6 @@ addButtonBtn.addEventListener("click", () => {
   buttons.push({ id: uid(), label: "", color: "#2b6cff", tags: [{ key: "", value: "" }] });
   renderButtons();
 });
-
-/* ============================ QuickFilters ============================ */
 
 const GEOMS = [
   ["any", "Any geometry"],
@@ -205,7 +201,7 @@ function syncFiltersFromDom() {
       name: card.querySelector(".f-name").value.trim(),
       color: card.querySelector(".f-color").value,
       geometry: card.querySelector(".f-geometry").value,
-      // `enabled` is owned by the in-editor toggle; preserve it here.
+
       enabled: byId[id] ? !!byId[id].enabled : false,
       present: collectTagRows(card.querySelector(".ost-present")),
       absent: collectTagRows(card.querySelector(".ost-absent"))
@@ -226,8 +222,6 @@ addFilterBtn.addEventListener("click", () => {
   });
   renderFilters();
 });
-
-/* ============================ Save / load ============================ */
 
 saveBtn.addEventListener("click", async () => {
   syncButtonsFromDom();

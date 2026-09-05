@@ -1,16 +1,12 @@
 (function () {
   "use strict";
 
-  // Overlays — upload a GPX/GeoJSON file and show it as a passive, toggleable
-  // layer drawn on top of the iD map, purely as a visual reference to trace
-  // over. It never intercepts pointer events, so you draw straight through it.
-
   const CONTROL_ID = "ost-ov-control";
   const PANE_ID = "ost-ov-pane";
   const LAYER_CLASS = "ost-ov-layer";
   const SVGNS = "http://www.w3.org/2000/svg";
   const STORAGE_KEY = "overlays";
-  const MAX_BYTES = 8 * 1024 * 1024; // guard against oversized uploads
+  const MAX_BYTES = 8 * 1024 * 1024;
 
   const PALETTE = [
     "#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
@@ -25,8 +21,7 @@
   let layerGroup = null;
   let observer = null;
   let legendLi = null;
-  // Number of storage writes we've made whose onChanged echo we should ignore —
-  // rebuilding the list on our own writes would cancel the toggle animation.
+
   let pendingEchoes = 0;
 
   function log(...args) {
@@ -40,20 +35,8 @@
     return document.querySelector("svg.surface") || document.querySelector(".surface");
   }
 
-  // --- projection ---------------------------------------------------------
-  //
-  // We draw our layer as a <g> inside iD's `.surface` SVG, in that SVG's own
-  // user-space coordinates — so iD's pan/zoom transforms carry it along for
-  // free, and we only need to re-project on redraw. To turn lon/lat into those
-  // coordinates we build a spherical Web-Mercator projection (the one iD uses)
-  // from two things we can read without touching iD internals:
-  //   * the map hash `#map=zoom/lat/lon` → view centre + zoom, and
-  //   * the surface's on-screen box + CTM → where that centre sits in local space.
-  // Everything else is a differential offset from the centre, so the exact
-  // translate/scale of iD's projection never needs to be recovered.
-
   function parseMapHash() {
-    // Hash looks like "#map=18.00/53.1234/9.8765" possibly among other &-params.
+
     const h = location.hash || "";
     const m = h.match(/map=([\d.]+)\/(-?[\d.]+)\/(-?[\d.]+)/);
     if (!m) return null;
@@ -66,7 +49,6 @@
 
   const D2R = Math.PI / 180;
 
-  // Mercator in "earth radians": X east-positive, Y north-positive.
   function mercX(lon) {
     return lon * D2R;
   }
@@ -75,9 +57,6 @@
     return Math.log(Math.tan(Math.PI / 4 + phi / 2));
   }
 
-  // Invert an SVG screen CTM (client px -> element user space). Mirrors the
-  // approach in addressfill.js: do the matrix math by hand so we never pass
-  // matrix objects across Firefox's content-script / page Xray boundary.
   function clientToLocal(m, cx, cy) {
     const { a, b, c, d, e, f } = m;
     const det = a * d - b * c;
@@ -93,25 +72,17 @@
       const w = el.wrappedJSObject;
       if (w && w.__data__) return w.__data__;
     } catch (e) {
-      /* wrappedJSObject unavailable */
+
     }
     return el.__data__ || null;
   }
 
-  // Local (surface user-space) position of a rendered node group: its transform
-  // origin maps to the node's location, and getScreenCTM().{e,f} gives that in
-  // client px — invert the surface CTM to bring it into local space. (Same
-  // read that addressfill.js uses for node positions.)
   function nodeLocal(surfaceCtm, el) {
     const m = el.getScreenCTM();
     if (!m) return null;
     return clientToLocal(surfaceCtm, m.e, m.f);
   }
 
-  // Preferred, assumption-free projector: iD binds each node's true [lon,lat]
-  // (entity.loc) to its element, so any two loaded nodes anchor the projection
-  // exactly. Scale comes from zoom; we recover only the translate from the pair,
-  // so it stays correct no matter how iD centres or offsets the view.
   function buildCalibratedProjector(surface, scale) {
     const surfaceCtm = surface.getScreenCTM();
     if (!surfaceCtm) return null;
@@ -130,10 +101,8 @@
     }
     if (refs.length < 2) return null;
 
-    // Anchor on the first ref, offset everything by scaled mercator deltas.
     const a = refs[0];
-    // Sanity check the fixed scale against the widest-separated ref pair; if it
-    // disagrees badly (rotated/odd view), bail so we don't draw a skewed layer.
+
     let far = a, bestSep = 0;
     for (const r of refs) {
       const sep = Math.abs(r.mx - a.mx) + Math.abs(r.my - a.my);
@@ -156,8 +125,6 @@
     };
   }
 
-  // Fallback when no nodes are loaded: assume the hash centre sits at the
-  // surface's box centre (how iD frames the view).
   function buildHashProjector(surface, scale, view) {
     const rect = surface.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -176,18 +143,14 @@
     };
   }
 
-  // Returns a function lon/lat -> {x, y} in the surface's user space, or null if
-  // we can't establish the projection right now.
   function buildProjector(surface) {
     const view = parseMapHash();
     if (!view) return null;
-    // Pixels per mercator-radian at this (fractional) zoom, tile size 256.
+
     const scale = (256 * Math.pow(2, view.zoom)) / (2 * Math.PI);
 
     return buildCalibratedProjector(surface, scale) || buildHashProjector(surface, scale, view);
   }
-
-  // --- rendering ----------------------------------------------------------
 
   function ensureLayerGroup(surface) {
     if (layerGroup && layerGroup.parentNode === surface) return layerGroup;
@@ -196,14 +159,11 @@
       layerGroup = document.createElementNS(SVGNS, "g");
       layerGroup.setAttribute("class", LAYER_CLASS);
     }
-    // Always keep it as the last child so it sits above iD's features.
+
     surface.appendChild(layerGroup);
     return layerGroup;
   }
 
-  // Push every [lon, lat] coordinate of a GeoJSON geometry into `sink`, calling
-  // it with a geometry kind ("point" | "line" | "ring") and an array of
-  // projected {x,y} points.
   function eachGeometry(geom, project, sink) {
     if (!geom || !geom.type) return;
     const t = geom.type;
@@ -248,21 +208,12 @@
     return d;
   }
 
-  // --- gradient (slope) analysis -----------------------------------------
-  //
-  // GPS elevation is too noisy to read point-to-point, so we resample each
-  // track into consecutive spans of at least SPAN_METERS horizontal length and
-  // take the slope of each span: grade% = Δelevation / horizontalDistance ·100.
-  // Each span is drawn as its own coloured piece of the track — so the colour IS
-  // the "which stretch does this refer to" marker — with a signed % label at the
-  // steeper ones. Blue = downhill, red = uphill; deeper = steeper, in 5% bands.
-
-  const SPAN_METERS = 25; // resampling window: smooths noise, keeps short climbs
-  const GRADE_STEP = 5; // percent per colour band / label threshold
-  const LABEL_MIN_PX = 52; // don't crowd labels closer than this on screen
-  const UP_COLORS = ["#fdd0a2", "#fdae6b", "#fd8d3c", "#e6550d", "#a63603"]; // 5..25%+
+  const SPAN_METERS = 25;
+  const GRADE_STEP = 5;
+  const LABEL_MIN_PX = 52;
+  const UP_COLORS = ["#fdd0a2", "#fdae6b", "#fd8d3c", "#e6550d", "#a63603"];
   const DOWN_COLORS = ["#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c"];
-  const FLAT_COLOR = "#9e9e9e"; // |grade| < 5%
+  const FLAT_COLOR = "#9e9e9e";
 
   function haversine(a, b) {
     const R = 6371000;
@@ -287,8 +238,6 @@
     return (grade > 0 ? "+" : "-") + Math.round(Math.abs(grade)) + "%";
   }
 
-  // Split a [lon,lat,ele?] line into spans of >= SPAN_METERS, each with its
-  // start/end index, horizontal length and grade (null when elevation missing).
   function slopeSpans(coords, minMeters) {
     const spans = [];
     if (coords.length < 2) return spans;
@@ -356,8 +305,6 @@
     }
   }
 
-  // Yield each leaf geometry object, resolving Feature/FeatureCollection/
-  // GeometryCollection wrappers.
   function eachGeometryObject(g, cb) {
     if (!g || !g.type) return;
     if (g.type === "FeatureCollection") {
@@ -385,8 +332,6 @@
     return found;
   }
 
-  // Our own writes into the surface would otherwise retrigger the childList
-  // observer, causing an endless redraw loop — pause it around the rebuild.
   function withObserverPaused(fn) {
     const wasObserving = !!observer;
     if (wasObserving) observer.disconnect();
@@ -411,7 +356,7 @@
       }
 
       const project = buildProjector(surface);
-      if (!project) return; // keep last drawing until we can project again
+      if (!project) return;
 
       drawLayer(group, active, project);
     });
@@ -442,8 +387,6 @@
     }
   }
 
-  // In gradient mode, lines are drawn as slope-coloured spans; any other
-  // geometry (points, polygons) falls back to the overlay's base colour.
   function drawGradientOverlay(o, project, ctx) {
     const base = o.color || "#e6194b";
     eachGeometryObject(o.geojson, (geom) => {
@@ -474,16 +417,13 @@
     group.appendChild(frag);
   }
 
-  // --- parsing ------------------------------------------------------------
-
   function coordsFromPts(nodes) {
     const out = [];
     for (const n of nodes) {
       const lat = parseFloat(n.getAttribute("lat"));
       const lon = parseFloat(n.getAttribute("lon"));
       if (!isFinite(lat) || !isFinite(lon)) continue;
-      // Keep elevation as GeoJSON's standard 3rd coordinate when present, so
-      // the gradient view can use it later.
+
       const eleEl = n.getElementsByTagName("ele")[0];
       const ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
       out.push(isFinite(ele) ? [lon, lat, ele] : [lon, lat]);
@@ -491,14 +431,10 @@
     return out;
   }
 
-  // getElementsByTagName matches by local name regardless of XML namespace,
-  // which bare CSS type-selectors do not — GPX files carry a default namespace.
   function tags(root, name) {
     return Array.from(root.getElementsByTagName(name));
   }
 
-  // Convert a GPX document into a GeoJSON FeatureCollection (waypoints as
-  // Points, routes and each track segment as LineStrings).
   function gpxToGeoJSON(text) {
     const doc = new DOMParser().parseFromString(text, "application/xml");
     if (doc.getElementsByTagName("parsererror").length) throw new Error("Invalid GPX/XML");
@@ -528,7 +464,7 @@
   function parseFile(name, text) {
     const lower = name.toLowerCase();
     if (lower.endsWith(".gpx")) return gpxToGeoJSON(text);
-    // .geojson / .json (and anything else) → try JSON, then fall back to GPX.
+
     try {
       const json = JSON.parse(text);
       if (json && json.type) return json;
@@ -592,10 +528,8 @@
     }
   }
 
-  // --- UI: control button + pane -----------------------------------------
-
   function layersIconSvg() {
-    // Simple stacked-layers glyph; `icon light` makes it white like iD controls.
+
     return (
       '<svg class="icon light" viewBox="0 0 24 24" aria-hidden="true">' +
       '<path fill="currentColor" d="M12 2 2 7l10 5 10-5-10-5zm0 7.2L4.8 7 12 3.8 19.2 7 12 9.2z"/>' +
@@ -604,7 +538,6 @@
     );
   }
 
-  // A plain polyline — the "just show the line" side of the mode toggle.
   function lineIconSvg() {
     return (
       '<svg viewBox="0 0 18 12" width="18" height="12" aria-hidden="true">' +
@@ -651,7 +584,7 @@
     const fileInput = paneEl.querySelector('input[type="file"]');
     fileInput.addEventListener("change", () => {
       handleFiles(fileInput.files);
-      fileInput.value = ""; // allow re-uploading the same filename
+      fileInput.value = "";
     });
 
     renderList();
@@ -671,9 +604,6 @@
     setPaneShown(paneEl.classList.contains("hide"));
   }
 
-  // Builds iD's native `.layer-list` markup (ul > li > label > input + span) so
-  // the list matches the Background/Map-Data panes, plus a color swatch and a
-  // per-overlay remove button.
   function renderList() {
     if (!listEl) return;
     listEl.innerHTML = "";
@@ -712,8 +642,6 @@
       span.append(swatch, name);
       label.append(cb, span);
 
-      // Display-mode switch — a two-position segmented toggle (plain line vs.
-      // slope %), shown only for tracks that carry elevation.
       let modeToggle = null;
       if (o._hasEle) {
         modeToggle = document.createElement("button");
@@ -724,7 +652,6 @@
         modeToggle.setAttribute("aria-label", "Slope gradient view");
         modeToggle.title = modeTitle(o.gradient);
 
-        // Sliding highlight behind the two options (animated via CSS transform).
         const thumb = document.createElement("span");
         thumb.className = "ost-ov-mode-thumb";
 
@@ -739,8 +666,7 @@
         modeToggle.append(thumb, optLine, optPct);
         modeToggle.addEventListener("click", () => {
           o.gradient = !o.gradient;
-          // Update the existing button in place (don't rebuild the row) so the
-          // thumb animates its slide instead of snapping to the new position.
+
           modeToggle.classList.toggle("gradient", o.gradient);
           modeToggle.classList.toggle("line", !o.gradient);
           modeToggle.setAttribute("aria-checked", o.gradient ? "true" : "false");
@@ -778,21 +704,16 @@
       : "Plain line — click for slope % view";
   }
 
-  // Show the legend (as the list's last item) exactly when some enabled track
-  // is in gradient mode. Managed separately from renderList so toggling the
-  // switch doesn't rebuild the row (which would cancel the slide animation).
   function updateLegend() {
     const show = overlays.some((o) => o.enabled && o.gradient && o._hasEle);
     if (show) {
       if (!legendLi) legendLi = buildGradientLegend();
-      listEl.appendChild(legendLi); // append() also re-orders it to the end
+      listEl.appendChild(legendLi);
     } else if (legendLi && legendLi.parentNode) {
       legendLi.remove();
     }
   }
 
-  // Compact colour key for the gradient view: blue = downhill, red = uphill,
-  // deepening in 5% steps.
   function buildGradientLegend() {
     const li = document.createElement("li");
     li.className = "ost-ov-legend";
@@ -802,7 +723,7 @@
 
     const ramp = document.createElement("span");
     ramp.className = "ost-ov-legend-ramp";
-    // One diverging bar: dark blue (steep downhill) → grey (flat) → dark red.
+
     const cells = DOWN_COLORS.slice().reverse().concat([FLAT_COLOR], UP_COLORS);
     cells.forEach((c) => {
       const sw = document.createElement("span");
@@ -824,10 +745,8 @@
     }
   }
 
-  // --- persistence --------------------------------------------------------
-
   function persist() {
-    // Strip runtime-only fields (e.g. _hasEle) before writing.
+
     const toStore = overlays.map((o) => ({
       id: o.id,
       name: o.name,
@@ -864,8 +783,7 @@
 
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes[STORAGE_KEY]) return;
-    // Ignore the echo of our own writes — the DOM already reflects them, and a
-    // full renderList would cancel an in-progress toggle animation.
+
     if (pendingEchoes > 0) {
       pendingEchoes--;
       return;
@@ -874,8 +792,6 @@
     renderList();
     reproject();
   });
-
-  // --- wiring -------------------------------------------------------------
 
   let placeScheduled = false;
   function tryPlaceControls() {
@@ -888,10 +804,6 @@
     return false;
   }
 
-  // iD rebuilds the surface on pan/zoom/edit; our <g> rides along via iD's
-  // transforms during interaction, but must be re-projected (and re-attached if
-  // dropped) once the redraw settles. Debounce on the surface mutations, and
-  // re-project immediately on hash changes (which carry the new view centre).
   let applyScheduled = false;
   function scheduleReproject() {
     if (applyScheduled) return;

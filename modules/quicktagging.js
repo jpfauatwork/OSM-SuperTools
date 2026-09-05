@@ -9,9 +9,6 @@
     console.log("[OSM SuperTools/QuickTagging]", ...args);
   }
 
-  // Raw ("Tags") tag-editor access lives in the shared module (window.OST);
-  // see modules/shared.js. Applies a whole set of tags (one button may carry
-  // several), overwriting each key's value on the selected feature.
   function applyTagSet(tags) {
     if (!OST.getRawTagContainer()) {
       setStatus("Select a feature first.", true);
@@ -31,8 +28,6 @@
     }
   }
 
-  // --- Panel UI ------------------------------------------------------------
-
   function setStatus(text, isError = false) {
     if (!statusEl) return;
     statusEl.textContent = text;
@@ -50,8 +45,6 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  // Normalizes a stored button into { label, color, tags: [{key,value}] }.
-  // Backward-compatible with the old single-tag shape ({ key, value }).
   function normalizeButton(btn) {
     let tags;
     if (Array.isArray(btn.tags)) {
@@ -107,8 +100,7 @@
       <div class="ost-body"></div>
       <div class="ost-status"></div>
     `;
-    // Parked in body until we find the sidebar anchor; kept invisible so it
-    // doesn't flash in the wrong place before being moved inline.
+
     panel.classList.add("ost-unplaced");
     document.body.appendChild(panel);
 
@@ -128,10 +120,6 @@
     renderButtons();
   }
 
-  // Moves the panel to sit immediately before the "Tags" section in the
-  // entity editor sidebar. Runs on every relevant DOM mutation because iD
-  // may (re)build the entity editor pane as the user selects/deselects
-  // features; cheap no-op if already correctly placed.
   function placePanel() {
     if (!panel) return;
     const container = OST.getRawTagContainer();

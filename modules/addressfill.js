@@ -2,25 +2,17 @@
   "use strict";
 
   const BTN_CLASS = "ost-addr-fill";
-  let hintRestore = []; // [ [inputEl, originalPlaceholderOrNull], … ]
+  let hintRestore = [];
 
   function log(...args) {
     console.log("[OSM SuperTools/AddressFill]", ...args);
   }
 
-  // --- geometry -----------------------------------------------------------
-
-  // Screen-space position of a rendered node group (g.point). Its transform's
-  // origin (0,0) maps to the node's location; getScreenCTM().{e,f} gives that
-  // in client pixels.
   function screenOriginOf(el) {
     const m = el.getScreenCTM();
     return m ? { x: m.e, y: m.f } : null;
   }
 
-  // Convert a client-pixel point into the local user space of a path element,
-  // by inverting the path's screen CTM manually (avoids passing matrix objects
-  // across the Firefox content-script / page Xray boundary).
   function screenToLocal(pathEl, sp) {
     const m = pathEl.getScreenCTM();
     if (!m) return null;
@@ -40,7 +32,7 @@
         return pathEl.isPointInFill({ x: local.x, y: local.y });
       }
     } catch (e) {
-      /* fall through to bbox */
+
     }
     try {
       const bb = pathEl.getBBox();
@@ -50,8 +42,6 @@
     }
   }
 
-  // --- feature detection --------------------------------------------------
-
   function addrTagsOf(tags) {
     const out = {};
     for (const k in tags) {
@@ -60,9 +50,6 @@
     return out;
   }
 
-  // The selected building: a selected area path with any building=* tag
-  // (house, yes, apartments, …), excluding building=no (a mapped footprint
-  // explicitly marked as not a building).
   function selectedBuilding() {
     const surface = OST.getSurface();
     if (!surface) return null;
@@ -73,8 +60,6 @@
     return null;
   }
 
-  // A rendered point (standalone node) inside the building that carries at least
-  // one addr:* tag. If several, prefer the one with the most addr tags.
   function findAddressPointInside(pathEl) {
     const surface = OST.getSurface();
     if (!surface) return null;
@@ -97,19 +82,14 @@
     return best;
   }
 
-  // --- Address field access ----------------------------------------------
-
   function addressField() {
     const byClass = document.querySelector(".entity-editor-pane .form-field-address");
     if (byClass) return byClass;
-    // Fallback: locate the field wrapping the addr-* inputs.
+
     const inp = document.querySelector('.entity-editor-pane input[class*="addr-"]');
     return inp ? inp.closest(".form-field") : null;
   }
 
-  // Map subfield id -> input element, e.g. { housenumber: <input.addr-housenumber> }.
-  // Some locales (e.g. Germany) use a combined "street+place" field whose input
-  // is classed `addr-street+place`; it is keyed under "street+place" here.
   function addrInputs(field) {
     const map = {};
     field.querySelectorAll('input[class*="addr-"]').forEach((inp) => {
@@ -120,8 +100,6 @@
     return map;
   }
 
-  // Resolves the input for an addr subfield, falling back to the combined
-  // "street+place" field for the `street`/`place` subfields.
   function inputForSubfield(inputs, sub) {
     if (inputs[sub]) return inputs[sub];
     if ((sub === "street" || sub === "place") && inputs["street+place"]) {
@@ -130,13 +108,11 @@
     return null;
   }
 
-  // --- hover hint + insert -----------------------------------------------
-
   function showHints(field, addr) {
     clearHints();
     const inputs = addrInputs(field);
     for (const key in addr) {
-      const sub = key.slice(5); // strip "addr:"
+      const sub = key.slice(5);
       const inp = inputForSubfield(inputs, sub);
       if (!inp) continue;
       hintRestore.push([inp, inp.getAttribute("placeholder")]);
@@ -163,8 +139,6 @@
     }
     log(`inserted ${applied} addr tag(s)`);
   }
-
-  // --- button lifecycle ---------------------------------------------------
 
   function removeButton() {
     const existing = document.querySelector("." + BTN_CLASS);
@@ -199,32 +173,24 @@
       return;
     }
 
-    // Identity of what the button represents. If an up-to-date button is
-    // already present we do NOT rebuild it: this runs on a debounced observer
-    // and iD redraws often, so recreating the element mid-click would cancel a
-    // slow click (mousedown and mouseup would land on different elements).
     const key =
       (building.entity.id || "") + "|" + (source.entity.id || "") + "|" + JSON.stringify(source.addr);
 
     const existing = document.querySelector("." + BTN_CLASS);
     if (existing && existing.dataset.ostKey === key && field.contains(existing)) {
-      return; // already correct — leave it alone
+      return;
     }
 
     if (existing) existing.remove();
     const btn = makeButton(field, source.addr);
     btn.dataset.ostKey = key;
     const label = field.querySelector(".field-label");
-    // Place between the "Address" text and the trailing icons (info button):
-    // iD appends the info/reference button last, so insert right after the
-    // flex:1 `.label-text`, which pushes us flush to the info button's left.
+
     const labelText = label && label.querySelector(".label-text");
     if (labelText) labelText.insertAdjacentElement("afterend", btn);
     else if (label) label.appendChild(btn);
     else (field.firstElementChild || field).appendChild(btn);
   }
-
-  // --- wiring -------------------------------------------------------------
 
   let scheduled = false;
   function schedule() {

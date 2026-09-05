@@ -14,8 +14,6 @@
   line-height: 1;
 }
 
-/* Drop the label on narrow viewports so the header stays uncluttered;
-   the gear icon and tooltip still convey the button. */
 @media (max-width: 991.98px) {
   .ost-topbar-label {
     display: none;

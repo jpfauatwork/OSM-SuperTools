@@ -1,21 +1,12 @@
-// OSM SuperTools — shared iD DOM helpers.
-// Loaded before the feature modules; exposes `window.OST`.
-//
-// Based on openstreetmap/iD: modules/ui/sections/raw_tag_editor.js,
-// modules/ui/entity_editor.js, modules/ui/inspector.js, modules/ui/disclosure.js
 (function () {
   "use strict";
 
-  // iD binds each rendered feature's entity ({id, type, tags, loc, …}) to its
-  // DOM element via d3's `__data__`. In Firefox a content script sees the page
-  // DOM through an Xray wrapper that hides page-set expandos, so reach through
-  // `wrappedJSObject`. Falls back to direct access (same-world test harness).
   function getEntity(el) {
     try {
       const w = el.wrappedJSObject;
       if (w && w.__data__) return w.__data__;
     } catch (e) {
-      /* wrappedJSObject unavailable (non-Firefox / test) */
+
     }
     return el.__data__ || null;
   }
@@ -23,15 +14,6 @@
   function getSurface() {
     return document.querySelector(".surface") || document.querySelector("svg.surface");
   }
-
-  // --- raw ("Tags") tag editor access -----------------------------------
-  //
-  //   .entity-editor-pane .section-raw-tag-editor.raw-tag-editor   <- container
-  //     details.disclosure-wrap
-  //       summary.hide-toggle                                       <- expand toggle
-  //       .disclosure-content > ul.tag-list
-  //         li.tag-row  ( .key-wrap input.key , .value-wrap input.value )
-  //         li.tag-row.add-tag                                      <- blank "add" row
 
   function getRawTagContainer() {
     return (
@@ -44,7 +26,7 @@
     const details = container.querySelector("details.disclosure-wrap");
     if (details && !details.open) {
       const summary = details.querySelector("summary.hide-toggle");
-      if (summary) summary.click(); // synchronously expands + renders .tag-list
+      if (summary) summary.click();
     }
   }
 
@@ -60,9 +42,6 @@
     return row.querySelector(".value-wrap input.value") || row.querySelector("input.value");
   }
 
-  // Sets the DOM value only, no events — used for the sibling value input which
-  // must already hold the right text before the key input's change event fires
-  // (iD's keyChange reads the sibling value synchronously when committing a key).
   function setRawValue(input, value) {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
     setter.call(input, value);
@@ -86,10 +65,6 @@
     return rows.find((r) => r.classList.contains("add-tag")) || rows[rows.length - 1] || null;
   }
 
-  // Applies one key/value onto the currently selected feature (overwrites an
-  // existing key, otherwise fills the blank trailing row). Re-queries the DOM
-  // every call because iD synchronously rebuilds the tag list after each commit.
-  // Returns true on success.
   function applyOneTag(key, value) {
     const container = getRawTagContainer();
     if (!container) return false;

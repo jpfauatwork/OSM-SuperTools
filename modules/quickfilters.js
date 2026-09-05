@@ -17,18 +17,12 @@
     console.warn("[OSM SuperTools/QuickFilters]", ...args);
   }
 
-  // --- entity access ------------------------------------------------------
-  // iD binds each rendered feature's entity ({id, type, tags, …}) to the DOM
-  // element via d3's `__data__`. In Firefox a content script sees the page DOM
-  // through an Xray wrapper that hides page-set expandos, so we reach through
-  // `wrappedJSObject` to read `__data__`. Falls back to direct access (e.g. in
-  // a same-world test harness).
   function getEntity(el) {
     try {
       const w = el.wrappedJSObject;
       if (w && w.__data__) return w.__data__;
     } catch (e) {
-      /* wrappedJSObject not available (non-Firefox / test) */
+
     }
     return el.__data__ || null;
   }
@@ -37,7 +31,6 @@
     return document.querySelector(".surface") || document.querySelector("svg.surface");
   }
 
-  // Determine point/line/area from the element's iD render classes.
   function geometryOf(el) {
     const c = el.classList;
     if (c.contains("area")) return "area";
@@ -52,12 +45,10 @@
     );
   }
 
-  // --- matching -----------------------------------------------------------
-
   function condMatches(tags, cond) {
-    if (!cond.key) return true; // empty condition is ignored
+    if (!cond.key) return true;
     if (!(cond.key in tags)) return false;
-    if (cond.value === "" || cond.value == null) return true; // key present, any value
+    if (cond.value === "" || cond.value == null) return true;
     return tags[cond.key] === cond.value;
   }
 
@@ -74,8 +65,6 @@
     }
     return true;
   }
-
-  // --- highlighting -------------------------------------------------------
 
   function clearHighlights(surface) {
     surface.querySelectorAll("." + MATCH_CLASS).forEach((el) => {
@@ -125,11 +114,8 @@
     return present || absent || geom;
   }
 
-  // --- UI: control button + pane -----------------------------------------
-
   function funnelIconSvg() {
-    // Reuse iD's own icon classes so it renders white like the other map
-    // controls and adapts to the editor theme.
+
     return (
       '<svg class="icon light" viewBox="0 0 24 24" aria-hidden="true">' +
       '<path fill="currentColor" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>'
@@ -179,8 +165,7 @@
     if (!paneEl) return;
     paneEl.classList.toggle("hide", !shown);
     paneEl.classList.toggle("shown", shown);
-    // Toggle `active` on the button so iD's own `.map-control > button.active`
-    // rule (link-colored background) applies, matching the native controls.
+
     const btn = controlEl && controlEl.querySelector("button");
     if (btn) btn.classList.toggle("active", shown);
   }
@@ -190,9 +175,6 @@
     setPaneShown(paneEl.classList.contains("hide"));
   }
 
-  // Builds iD's native `.layer-list` markup (ul > li > label > input + span) so
-  // the list is styled identically to the Background pane, plus a per-filter
-  // color swatch and a live match count.
   function renderList() {
     if (!listEl) return;
     listEl.innerHTML = "";
@@ -239,10 +221,6 @@
     }
   }
 
-  // Persist the current filter set (only `enabled` ever changes here). We write
-  // the whole in-memory array — which is kept in sync with storage via
-  // loadFilters + onChanged — so there's no get-modify-set race, and the
-  // resulting self-fired onChanged simply re-applies the same state.
   function persistEnabledState() {
     const toStore = filters.map((f) => ({
       id: f.id,
@@ -255,8 +233,6 @@
     }));
     browser.storage.local.set({ filters: toStore });
   }
-
-  // --- wiring -------------------------------------------------------------
 
   function normalizeFilter(f) {
     return {
@@ -280,8 +256,7 @@
 
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.filters) return;
-    // Storage is the source of truth (updated by our own toggles and by the
-    // options page). Adopt it directly; applyHighlights recomputes match counts.
+
     filters = (changes.filters.newValue || []).map(normalizeFilter);
     renderList();
     applyHighlights();
@@ -298,8 +273,6 @@
     return false;
   }
 
-  // iD rebuilds the surface on pan/zoom/edit, dropping our highlight classes on
-  // newly entered elements — reapply (debounced) whenever the surface mutates.
   let applyScheduled = false;
   function observe() {
     const observer = new MutationObserver(() => {

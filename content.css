@@ -98,12 +98,6 @@
   color: #e06c6c;
 }
 
-/* ===================================================================== */
-/* QuickFilters                                                           */
-/* ===================================================================== */
-
-/* Feature highlight — overrides iD's own stroke/fill via !important, tinted
-   per filter through the --ost-qf-color custom property set on the element. */
 .surface .ost-qf-match {
   stroke: var(--ost-qf-color, #ff2d95) !important;
   stroke-width: 5px !important;
@@ -122,29 +116,20 @@
   stroke-width: 4px !important;
 }
 
-/* Control button — iD's own `.map-control > button` (dark bg) and
-   `.icon.light` (white icon) rules already apply; center the icon in the
-   40x40 button like the native controls. */
 #ost-qf-control > button {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* --- Pane: reuses iD's own `.layer-list` markup so the list is styled exactly
-   like the Background pane; these rules only add the color swatch, the match
-   count, and the swatch+name layout inside iD's label span. --- */
-
 .ost-qf-list {
   margin-bottom: 10px;
 }
 
-/* iD makes `.layer-list > li` a flex row; keep our count vertically centered. */
 .ost-qf-list > li {
   align-items: center;
 }
 
-/* iD's `label > span` is a single block; make ours lay out swatch + name. */
 .ost-qf-list label > span {
   display: flex;
   align-items: center;
@@ -188,7 +173,6 @@
   display: block;
 }
 
-/* "Manage filters" — styled like iD's call-to-action buttons */
 .ost-qf-manage {
   display: block;
   width: 100%;
@@ -215,12 +199,6 @@
   padding: 0 4px;
 }
 
-/* ===================================================================== */
-/* Overlays                                                              */
-/* ===================================================================== */
-
-/* The drawn layer is a passive tracing reference — never let it eat clicks
-   meant for the iD map underneath. */
 .surface .ost-ov-layer {
   pointer-events: none;
 }
@@ -231,7 +209,6 @@
   justify-content: center;
 }
 
-/* Pane list — reuses iD's `.layer-list` markup like QuickFilters does. */
 .ost-ov-list {
   margin-bottom: 10px;
 }
@@ -266,9 +243,6 @@
   white-space: nowrap;
 }
 
-/* Remove button. iD styles buttons inside its panes with high-specificity
-   rules (fixed width, its own padding), so — like AddressFill does for the
-   address field — we scope under the pane + list and use !important to win. */
 .ost-ov-pane .ost-ov-list .ost-ov-remove {
   flex: 0 0 auto !important;
   align-self: center !important;
@@ -289,10 +263,6 @@
   color: #e06c6c;
 }
 
-/* Display-mode switch: a two-segment slider (plain line | slope %) with a blue
-   "thumb" that slides between the halves. We pin an explicit width and equal
-   50% halves with !important, so iD's own button width/max-width rules can't
-   clip the second option (which had hidden the "%" behind `overflow:hidden`). */
 .ost-ov-pane .ost-ov-list .ost-ov-mode {
   position: relative;
   flex: 0 0 auto !important;
@@ -350,16 +320,11 @@
   display: block;
 }
 
-/* The option sitting over the thumb reads white. */
 .ost-ov-mode.line .ost-ov-mode-line,
 .ost-ov-mode.gradient .ost-ov-mode-pct {
   color: #fff;
 }
 
-/* Gradient colour legend — a single diverging bar, centred in the row with
-   generous breathing room above and below. iD makes `.layer-list > li` a flex
-   row and already draws the divider between items, so we add no border of our
-   own (that produced a second line) and just force this li to centre and pad. */
 .ost-ov-pane .ost-ov-list .ost-ov-legend {
   display: flex !important;
   box-sizing: border-box;
@@ -409,8 +374,6 @@
   display: block;
 }
 
-/* "Upload…" — styled like iD's call-to-action buttons; the real <input> is
-   hidden and driven by clicking this label. */
 .ost-ov-upload {
   display: block;
   width: 100%;
@@ -450,14 +413,6 @@
   padding: 0 4px;
 }
 
-/* ===================================================================== */
-/* AddressFill                                                            */
-/* ===================================================================== */
-
-/* "fill" button inserted after the flex:1 `.label-text`, so it sits at the
-   right of the label just left of iD's trailing info button.
-   !important is needed to beat iD's high-specificity `.field-label button`
-   rules (fixed 32px width and a :not(:hover) background reset). */
 .field-label .ost-addr-fill {
   margin: 4px 6px 4px 4px !important;
   align-self: center !important;
@@ -479,7 +434,6 @@
   border-color: var(--link-focus-color, #597be7) !important;
 }
 
-/* Address inputs showing a hover preview of the source point's values. */
 .ost-addr-hint::placeholder {
   color: var(--link-color, #7092ff);
   opacity: 0.9;
@@ -487,4 +441,184 @@
 }
 .ost-addr-hint {
   box-shadow: inset 0 0 0 1px var(--link-color, #7092ff);
+}
+
+.surface .ost-ps-layer {
+  pointer-events: none;
+}
+
+.ost-ps-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.ost-ps-mode-button .icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.ost-ps-mode-button .label {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ost-ps-mode-button.active {
+  background: var(--link-color, #7092ff);
+  color: #fff;
+}
+
+#ost-ps-capture {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  cursor: crosshair;
+  background: transparent;
+}
+
+#ost-ps-toolbar {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  font: 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#ost-ps-toolbar .ost-ps-tb-btn {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+#ost-ps-toolbar .ost-ps-tb-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#ost-ps-toolbar .ost-ps-tb-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#ost-ps-toolbar .ost-ps-tb-ok {
+  border-color: #4caf72;
+  background: #3a9b60;
+}
+
+#ost-ps-toolbar .ost-ps-tb-ok:hover:not(:disabled) {
+  background: #45b06f;
+}
+
+#ost-ps-toolbar .ost-ps-tb-cancel {
+  border-color: rgba(224, 108, 108, 0.6);
+}
+
+#ost-ps-toolbar .ost-ps-tb-n {
+  min-width: 22px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+#ost-ps-toolbar .ost-ps-tb-dims {
+  font-size: 12px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+#ost-ps-toolbar .ost-ps-tb-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 2px;
+}
+
+#ost-ps-toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  z-index: 2100;
+  max-width: 80%;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+#ost-ps-toast.shown {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#ost-ps-toast.ost-ps-toast-error {
+  background: rgba(120, 30, 30, 0.94);
+}
+
+.edit-menu-item.ost-dir-item .icon.operation {
+  width: 20px;
+  height: 20px;
+  color: var(--link-color, #7092ff);
+}
+
+#ost-dir-capture {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  cursor: crosshair;
+  background: transparent;
+}
+
+#ost-dir-capture svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#ost-dir-toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  z-index: 2100;
+  max-width: 80%;
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+#ost-dir-toast.shown {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#ost-dir-toast.ost-dir-toast-error {
+  background: rgba(120, 30, 30, 0.94);
 }
