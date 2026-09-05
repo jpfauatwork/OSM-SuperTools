@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OSM SuperTools",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A modular toolkit for the OpenStreetMap iD editor: QuickTagging (one-click tag sets), QuickFilters (highlight loaded features by tag query), Overlays (trace over an uploaded GPX/GeoJSON), AddressFill (copy a point's address onto its building), ParkingSplit (split a rectangle into equal parking spaces), and PointDirection (set a node's direction by aiming).",
   "browser_specific_settings": {
     "gecko": {
