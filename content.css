@@ -542,6 +542,13 @@
   white-space: nowrap;
 }
 
+#ost-ps-toolbar .ost-ps-tb-tilt {
+  min-width: 34px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 #ost-ps-toolbar .ost-ps-tb-sep {
   width: 1px;
   align-self: stretch;

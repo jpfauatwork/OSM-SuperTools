@@ -10,6 +10,7 @@
   const PARKING_TAGS = { amenity: "parking_space" };
   const MIN_N = 1;
   const MAX_N = 200;
+  const MAX_TILT = 75;
 
   let mode = "idle";
   let clicks = [];
@@ -17,6 +18,7 @@
   let cornersLL = null;
   let divisions = 4;
   let axisFlip = false;
+  let tilt = 0;
 
   let controlEl = null;
   let layerGroup = null;
@@ -206,9 +208,32 @@
     return cornersLL.map((c) => project(c.lon, c.lat));
   }
 
-  function buildGrid(cornersLocal, n) {
+  // Local corners with the tilt applied. The shear runs ALONG the split axis
+  // (the aisle direction), so those long/aisle edges keep their direction while
+  // the perpendicular edges — the lines that divide the bays — tilt in parallel,
+  // making each bay a parallelogram. `tilt` is exactly that edge's angle from
+  // the perpendicular; tilt 0 gives the original rectangle.
+  function shearedCorners(project, axis) {
+    const [A, B, C0, D0] = cornersLocalFromLL(project);
+    if (!tilt) return [A, B, C0, D0];
+    const p = sub(B, A); // baseline edge (A→B / D0→C0)
+    const q = sub(D0, A); // depth edge (A→D0 / B→C0)
+    const Lp = len(p);
+    const Lq = len(q);
+    if (Lp < 1e-6 || Lq < 1e-6) return [A, B, C0, D0];
+    const t = Math.tan((tilt * Math.PI) / 180);
+    if (axis === "AB") {
+      // aisle = A→B: keep the p-edges steady, slide the far p-edge (C0,D0).
+      const shift = scaleVec(p, (Lq * t) / Lp);
+      return [A, B, add(C0, shift), add(D0, shift)];
+    }
+    // aisle = A→D: keep the q-edges steady, slide the far q-edge (B,C0).
+    const shift = scaleVec(q, (Lp * t) / Lq);
+    return [A, add(B, shift), add(C0, shift), D0];
+  }
+
+  function buildGrid(cornersLocal, n, axis) {
     const [A, B, C, D] = cornersLocal;
-    const axis = splitAxis(cornersLocal);
     const nodes = [];
     const rings = [];
     const lines = [];
@@ -348,8 +373,9 @@
     if (!project) return;
 
     const group = ensureLayerGroup(surface);
-    const cl = cornersLocalFromLL(project.project);
-    const grid = buildGrid(cl, divisions);
+    const axis = splitAxis(cornersLocalFromLL(project.project));
+    const cl = shearedCorners(project.project, axis);
+    const grid = buildGrid(cl, divisions, axis);
 
     group.textContent = "";
     const frag = document.createDocumentFragment();
@@ -454,6 +480,9 @@
     cursorLocal = null;
     render();
     buildToolbar();
+    setStatusToast(
+      "Pfeiltasten: verschieben (Umschalt = größer) · +/−: Anzahl · [ ]: Neigung · R: Achse · Enter: anlegen · Esc: abbrechen"
+    );
   }
 
   function setDivisions(n) {
@@ -465,6 +494,28 @@
   function flipAxis() {
     axisFlip = !axisFlip;
     updateToolbar();
+    render();
+  }
+
+  function setTilt(deg) {
+    tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, Math.round(deg)));
+    updateToolbar();
+    render();
+  }
+
+  // Translate the whole shape by a screen-space nudge (dx, dy in px), converted
+  // to a lon/lat delta so it stays put across pan/zoom. Used by the arrow keys.
+  function nudge(dx, dy) {
+    if (!cornersLL) return;
+    const surface = getSurface();
+    const project = surface && buildProjection(surface);
+    if (!project) return;
+    const a = cornersLL[0];
+    const aLocal = project.project(a.lon, a.lat);
+    const moved = project.unproject(aLocal.x + dx, aLocal.y + dy);
+    const dLon = moved.lon - a.lon;
+    const dLat = moved.lat - a.lat;
+    cornersLL = cornersLL.map((c) => ({ lon: c.lon + dLon, lat: c.lat + dLat }));
     render();
   }
 
@@ -485,7 +536,11 @@
       '<span class="ost-ps-tb-sep"></span>' +
       '<span class="ost-ps-tb-dims"></span>' +
       '<span class="ost-ps-tb-sep"></span>' +
-      '<button type="button" class="ost-ps-tb-btn" data-act="flip" title="Teilungs-Achse wechseln (R)">⟲</button>' +
+      '<button type="button" class="ost-ps-tb-btn" data-act="tiltdec" title="Neigung gegen den Uhrzeigersinn (Taste [)">↺</button>' +
+      '<span class="ost-ps-tb-tilt" title="Neigung / Parallelogramm"></span>' +
+      '<button type="button" class="ost-ps-tb-btn" data-act="tiltinc" title="Neigung im Uhrzeigersinn (Taste ])">↻</button>' +
+      '<span class="ost-ps-tb-sep"></span>' +
+      '<button type="button" class="ost-ps-tb-btn" data-act="flip" title="Teilungs-Achse wechseln (R)">⇄</button>' +
       '<button type="button" class="ost-ps-tb-btn ost-ps-tb-ok" data-act="apply" title="Flächen anlegen (Enter)">✓ Anlegen</button>' +
       '<button type="button" class="ost-ps-tb-btn ost-ps-tb-cancel" data-act="cancel" title="Abbrechen (Esc)">✕</button>';
     anchor.appendChild(toolbarEl);
@@ -496,6 +551,8 @@
       const act = btn.dataset.act;
       if (act === "dec") setDivisions(divisions - 1);
       else if (act === "inc") setDivisions(divisions + 1);
+      else if (act === "tiltdec") setTilt(tilt - 5);
+      else if (act === "tiltinc") setTilt(tilt + 5);
       else if (act === "flip") flipAxis();
       else if (act === "apply") commit();
       else if (act === "cancel") cancelAll();
@@ -527,6 +584,8 @@
       dimsEl.textContent =
         "je " + dims.bayWidth.toFixed(1) + " × " + dims.bayDepth.toFixed(1) + " m";
     }
+    const tiltEl = toolbarEl.querySelector(".ost-ps-tb-tilt");
+    if (tiltEl) tiltEl.textContent = tilt + "°";
     const okBtn = toolbarEl.querySelector(".ost-ps-tb-ok");
     if (okBtn) {
       okBtn.disabled = !pageReady;
@@ -553,19 +612,44 @@
       return;
     }
     if (mode !== "adjusting") return;
-    if (e.key === "+" || e.key === "=" || e.key === "ArrowUp") {
-      setDivisions(divisions + 1);
-      e.preventDefault();
-    } else if (e.key === "-" || e.key === "ArrowDown") {
-      setDivisions(divisions - 1);
-      e.preventDefault();
-    } else if (e.key === "r" || e.key === "R") {
-      flipAxis();
-      e.preventDefault();
-    } else if (e.key === "Enter") {
-      commit();
-      e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    switch (e.key) {
+      case "+":
+      case "=":
+        setDivisions(divisions + 1);
+        break;
+      case "-":
+        setDivisions(divisions - 1);
+        break;
+      case "ArrowLeft":
+        nudge(-step, 0);
+        break;
+      case "ArrowRight":
+        nudge(step, 0);
+        break;
+      case "ArrowUp":
+        nudge(0, -step);
+        break;
+      case "ArrowDown":
+        nudge(0, step);
+        break;
+      case "[":
+        setTilt(tilt - 1);
+        break;
+      case "]":
+        setTilt(tilt + 1);
+        break;
+      case "r":
+      case "R":
+        flipAxis();
+        break;
+      case "Enter":
+        commit();
+        break;
+      default:
+        return;
     }
+    e.preventDefault();
   }
 
   let keysBound = false;
@@ -591,8 +675,9 @@
       setStatusToast("Projektion nicht möglich", true);
       return;
     }
-    const cl = cornersLocalFromLL(project.project);
-    const grid = buildGrid(cl, divisions);
+    const axis = splitAxis(cornersLocalFromLL(project.project));
+    const cl = shearedCorners(project.project, axis);
+    const grid = buildGrid(cl, divisions, axis);
 
     const nodes = grid.nodes.map((p) => {
       const ll = project.unproject(p.x, p.y);
@@ -649,6 +734,7 @@
     clicks = [];
     cursorLocal = null;
     axisFlip = false;
+    tilt = 0;
   }
 
   function cancelAll() {
