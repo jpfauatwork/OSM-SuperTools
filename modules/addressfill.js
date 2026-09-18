@@ -3,6 +3,8 @@
 
   const BTN_CLASS = "ost-addr-fill";
   let hintRestore = [];
+  let reqCounter = 0;
+  const pending = new Map();
 
   function log(...args) {
     console.log("[OSM SuperTools/AddressFill]", ...args);
@@ -132,12 +134,65 @@
 
   function insertAddress(addr) {
     clearHints();
-    if (!OST.getRawTagContainer()) return;
+    if (!OST.getRawTagContainer()) return 0;
     let applied = 0;
     for (const key in addr) {
       if (OST.applyOneTag(key, addr[key])) applied++;
     }
     log(`inserted ${applied} addr tag(s)`);
+    return applied;
+  }
+
+  // Only a node that carries nothing but addr:* tags is a pure address point we
+  // may remove after copying — never a POI (shop, amenity, …) that happens to
+  // have an address.
+  function isPureAddressNode(entity) {
+    const tags = (entity && entity.tags) || {};
+    let n = 0;
+    for (const k in tags) {
+      if (k.indexOf("addr:") !== 0) return false;
+      n++;
+    }
+    return n > 0;
+  }
+
+  // Delete the source address point via the page-world bridge, in its own undo
+  // step. The address has already been copied onto the building by this point.
+  function deletePoint(id) {
+    return new Promise((resolve, reject) => {
+      const reqId = "addr-del-" + ++reqCounter;
+      pending.set(reqId, { resolve, reject });
+      window.postMessage(
+        {
+          __ost: "ost-add-features",
+          reqId,
+          payload: {
+            nodes: [],
+            ways: [],
+            deleteIds: [id],
+            annotation: "AddressFill: Adresspunkt entfernt"
+          }
+        },
+        location.origin
+      );
+      setTimeout(() => {
+        if (pending.has(reqId)) {
+          pending.delete(reqId);
+          reject(new Error("Zeitüberschreitung (keine Antwort aus der Seitenwelt)"));
+        }
+      }, 8000);
+    });
+  }
+
+  function onPageMessage(ev) {
+    if (ev.source !== window || ev.origin !== location.origin) return;
+    const d = ev.data;
+    if (!d || typeof d !== "object" || d.__ost !== "ost-result") return;
+    const p = pending.get(d.reqId);
+    if (!p) return;
+    pending.delete(d.reqId);
+    if (d.ok) p.resolve(d);
+    else p.reject(new Error(d.error || "Unbekannter Fehler"));
   }
 
   function removeButton() {
@@ -146,12 +201,18 @@
     clearHints();
   }
 
-  function makeButton(field, addr) {
+  function makeButton(field, source) {
+    const addr = source.addr;
+    const pureAddressPoint = isPureAddressNode(source.entity);
+    const pointId = source.entity && source.entity.id;
+
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = BTN_CLASS;
     btn.textContent = "fill";
-    btn.title = "Fill address from a point inside this building";
+    btn.title = pureAddressPoint
+      ? "Fill address from the point inside — and remove that point"
+      : "Fill address from a point inside this building";
     btn.addEventListener("mouseenter", () => showHints(field, addr));
     btn.addEventListener("mouseleave", () => clearHints());
     btn.addEventListener("focus", () => showHints(field, addr));
@@ -159,7 +220,12 @@
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      insertAddress(addr);
+      const applied = insertAddress(addr);
+      // Remove the source point only when the copy worked and the point is a
+      // pure address node (so we never delete a POI that carries an address).
+      if (applied > 0 && pointId && pureAddressPoint) {
+        deletePoint(pointId).catch((e) => log("could not delete address point:", e && e.message));
+      }
     });
     return btn;
   }
@@ -182,7 +248,7 @@
     }
 
     if (existing) existing.remove();
-    const btn = makeButton(field, source.addr);
+    const btn = makeButton(field, source);
     btn.dataset.ostKey = key;
     const label = field.querySelector(".field-label");
 
@@ -207,6 +273,7 @@
   }
 
   function init() {
+    window.addEventListener("message", onPageMessage);
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true });
     schedule();

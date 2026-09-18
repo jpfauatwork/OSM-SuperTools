@@ -45,3 +45,15 @@ browser.runtime.onMessage.addListener((message) => {
     browser.runtime.openOptionsPage();
   }
 });
+
+// AlkisImport fetches the LGLN WFS here so the request carries the extension's
+// host permission and is not subject to page-origin CORS. Returns the raw GML.
+browser.runtime.onMessage.addListener((message) => {
+  if (!message || message.type !== "alkis-wfs" || typeof message.url !== "string") return;
+  if (!message.url.startsWith("https://opendata.lgln.niedersachsen.de/")) {
+    return Promise.resolve({ ok: false, error: "URL nicht erlaubt" });
+  }
+  return fetch(message.url, { credentials: "omit" })
+    .then(async (r) => ({ ok: r.ok, status: r.status, text: await r.text() }))
+    .catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
+});

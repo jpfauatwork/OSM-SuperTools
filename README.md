@@ -16,7 +16,7 @@ Upload a GPX or GeoJSON file and show it as a passive layer drawn on top of the 
 **Gradient view:** when a track carries elevation, a **%** button appears next to it. Toggle it and the track is recoloured by slope — blue for downhill, red for uphill, deepening as it gets steeper — with a signed percentage label on the steeper stretches (e.g. `-12%`) and a color key under the list.
 
 ### AddressFill
-When you select a building that contains a point with address tags (e.g. a shop or POI mapped inside it), a **fill** button appears next to the Address field. Hovering previews the point's address in the address inputs; clicking copies all its `addr:*` tags onto the building.
+When you select a building that contains a point with address tags (e.g. a shop or POI mapped inside it), a **fill** button appears next to the Address field. Hovering previews the point's address in the address inputs; clicking copies all its `addr:*` tags onto the building. If that point is a **pure address node** (nothing but `addr:*` tags), it is also removed once the address has been copied — the address moves onto the building in one click. A point that carries other tags (a shop, amenity, …) is kept.
 
 ### ParkingSplit
 Draw a (possibly rotated) rectangle over the map and split it into any number of equal `amenity=parking_space` areas in one step — handy for mapping whole rows of marked bays. It adds a **Parking lots** button as a fourth option next to iD's Point / Line / Area in the top toolbar.
@@ -39,6 +39,24 @@ Set a `direction` on a node by aiming with the mouse — useful for viewpoints, 
 3. Click to confirm — the aimed bearing is written to the node as `direction=<degrees>` (0 = north, clockwise). Hold **Shift** while aiming to snap to 5° steps; **Esc** or right-click cancels.
 
 The tag is written in one step, so `Ctrl+Z` undoes it.
+
+### AlkisImport
+Pull an exact building outline out of the official Niedersachsen cadastre (ALKIS) instead of tracing it by hand over the raster layer. It queries the LGLN [`alkis_wfs_sf`](https://opendata.lgln.niedersachsen.de/doorman/noauth/alkis_wfs_sf) Web Feature Service for the survey geometry and drops it into iD as an editable way.
+
+**How to use it:**
+
+1. Select **Niedersachsen ALKIS** as the background layer. The extra menu items only appear while that layer is active (editor-imagery-index id `Niedersachsen-ALKIS`); with any other background nothing changes.
+2. Right-click inside the building you want. iD's own edit menu opens with extra ALKIS items added at the front:
+   - **Von ALKIS holen** — fetches the building at that point (`building=yes`) **together with all its small parts** — the dashed bits in the ALKIS map: overhangs, arcades and passages (ALKIS `AX_Bauteil`, added as `building:part=yes`). If a standalone address point sits inside the outline — or you right-clicked an address point — its `addr:*` tags are carried onto the new building and the point is removed, all in one undo step.
+   - **Gebäude durch ALKIS ersetzen** (only when you right-clicked an existing building) — replaces that building with the ALKIS geometry, keeping its tags (address, name, …).
+   - **Adresse kopieren** (only when the clicked object has an address) — copies the address to the clipboard.
+3. `Ctrl+Z` undoes the whole action in one step.
+
+**Connecting to neighbours:** imported outlines are glued rather than dropped as loose duplicates. Vertices that coincide (within ~0.2 m) are merged into one shared node, and a vertex that lands on a neighbouring building's wall (within ~0.3 m) is spliced into that wall — so terraced/adjoining buildings end up properly connected, and a building and its overhang share their common edge. The gluing runs in one undo step and falls back to a plain add if anything looks off.
+
+iD's native menu items (paste, copy, delete, …) stay in place — the ALKIS items are added, not a replacement. The WFS request runs from the extension's background script (declared host permission `opendata.lgln.niedersachsen.de`) to avoid CORS.
+
+**Attribution / licence:** ALKIS is © GeoBasis-DE/LGLN, provided under CC BY 4.0 with **explicit permission for OSM use** ([DE:Niedersachsen/Geoportal](https://wiki.openstreetmap.org/wiki/DE:Niedersachsen/Geoportal)). Attribution is satisfied via the OSM [Contributors list](https://wiki.openstreetmap.org/wiki/Contributors), so no per-object `source` tag is needed. If you want one anyway, set `SOURCE_TAG` in `modules/alkisimport.js` (e.g. `© GeoBasis-DE/LGLN 2025`).
 
 ## Install
 
