@@ -4,7 +4,9 @@
   // CsvImport: read a semicolon-separated list of nodes/ways (format in the
   // README), preview it on iD's Custom Map Data layer, then create the selected
   // rows as new, editable features in one undo step and let the user step
-  // through them for review before uploading.
+  // through them for review before uploading. A row can also name an existing
+  // object (way/123, node/5, relation/9) and patch its tags: the given tags are
+  // set/overwritten, all others stay.
 
   const CONTROL_ID = "ost-csv-control";
   const PANE_ID = "ost-csv-pane";
@@ -20,7 +22,10 @@
   let discardBtn = null;
   let selectAllBtn = null;
 
-  let rows = []; // parsed rows: { line, type, coords, closed, tags, error, checked, id }
+  // parsed rows: { line, type, coords, closed, tags, error, checked, id }
+  // plus for type "modify": osmId (iD id, e.g. "w123"), current (loaded tags or
+  // null), loadError, status (after import: changed|unchanged|missing)
+  let rows = [];
   let imported = false;
   let pageReady = false;
   const pending = new Map();
@@ -104,6 +109,19 @@
     return coords;
   }
 
+  const OSM_TYPES = { node: "n", way: "w", relation: "r" };
+  const OSM_NAMES = { n: "node", w: "way", r: "relation" };
+
+  // "way/123", "node/42", "relation/9" → iD id ("w123", "n42", "r9"), else null.
+  function parseOsmRef(raw) {
+    const m = raw.match(/^(node|way|relation)\/(\d+)$/);
+    return m ? OSM_TYPES[m[1]] + m[2] : null;
+  }
+
+  function osmRefLabel(osmId) {
+    return OSM_NAMES[osmId[0]] + "/" + osmId.slice(1);
+  }
+
   function sameLoc(a, b) {
     return a[0] === b[0] && a[1] === b[1];
   }
@@ -112,23 +130,42 @@
     const row = { line, type: null, coords: [], closed: false, tags: {}, error: null, checked: true, id: null };
     try {
       const rawType = (fields[0] || "").trim().toLowerCase();
-      const type = TYPE_ALIASES[rawType];
-      if (!type) throw new Error(`Unbekannter Typ „${fields[0].trim()}“ (erlaubt: node, way, area)`);
-      if (fields.length < 2 || !fields[1].trim()) throw new Error("Koordinaten fehlen");
+      const osmId = parseOsmRef(rawType);
+      const type = osmId ? "modify" : TYPE_ALIASES[rawType];
+      if (!type) {
+        throw new Error(
+          `Unbekannter Typ „${fields[0].trim()}“ (erlaubt: node, way, area oder node/<id>, way/<id>, relation/<id>)`
+        );
+      }
 
-      let coords = parseCoords(fields[1]);
-      if (type === "node") {
-        if (coords.length !== 1) throw new Error(`node braucht genau 1 Koordinate, hat ${coords.length}`);
-        row.type = "node";
-      } else {
-        const closedByCoords = coords.length > 2 && sameLoc(coords[0], coords[coords.length - 1]);
-        if (closedByCoords) coords = coords.slice(0, -1);
-        row.closed = type === "area" || closedByCoords;
-        const min = row.closed ? 3 : 2;
-        if (coords.length < min) {
-          throw new Error(`${type} braucht mindestens ${min} verschiedene Koordinaten`);
+      let coords;
+      if (type === "modify") {
+        // Coordinate is optional here and only used for preview/zoom.
+        row.type = "modify";
+        row.osmId = osmId;
+        row.current = null;
+        row.loadError = null;
+        row.status = null;
+        coords = fields.length > 1 && fields[1].trim() ? parseCoords(fields[1]) : [];
+        if (coords.length > 1) {
+          throw new Error(`Änderungszeile erlaubt höchstens 1 Koordinate, hat ${coords.length}`);
         }
-        row.type = "way";
+      } else {
+        if (fields.length < 2 || !fields[1].trim()) throw new Error("Koordinaten fehlen");
+        coords = parseCoords(fields[1]);
+        if (type === "node") {
+          if (coords.length !== 1) throw new Error(`node braucht genau 1 Koordinate, hat ${coords.length}`);
+          row.type = "node";
+        } else {
+          const closedByCoords = coords.length > 2 && sameLoc(coords[0], coords[coords.length - 1]);
+          if (closedByCoords) coords = coords.slice(0, -1);
+          row.closed = type === "area" || closedByCoords;
+          const min = row.closed ? 3 : 2;
+          if (coords.length < min) {
+            throw new Error(`${type} braucht mindestens ${min} verschiedene Koordinaten`);
+          }
+          row.type = "way";
+        }
       }
       row.coords = coords;
 
@@ -166,7 +203,7 @@
 
   // ---- page bridge -----------------------------------------------------------
 
-  function request(type, payload) {
+  function request(type, payload, timeoutMs) {
     const reqId = "csv-" + ++reqSeq + "-" + Date.now();
     return new Promise((resolve, reject) => {
       pending.set(reqId, { resolve, reject });
@@ -176,7 +213,7 @@
           pending.delete(reqId);
           reject(new Error("Zeitüberschreitung (keine Antwort aus der Seitenwelt)"));
         }
-      }, 8000);
+      }, timeoutMs || 8000);
     });
   }
 
@@ -199,7 +236,7 @@
 
   function rowGeometry(r) {
     const ll = r.coords.map((c) => [c[0], c[1]]);
-    if (r.type === "node") return { type: "Point", coordinates: ll[0] };
+    if (r.type === "node" || r.type === "modify") return { type: "Point", coordinates: ll[0] };
     if (r.closed) return { type: "Polygon", coordinates: [ll.concat([ll[0]])] };
     return { type: "LineString", coordinates: ll };
   }
@@ -221,7 +258,37 @@
   }
 
   function checkedRows() {
-    return rows.filter((r) => !r.error && r.checked);
+    return rows.filter((r) => !r.error && r.checked && !isNoChange(r));
+  }
+
+  // Tag keys of a modify row whose value differs from the loaded object.
+  function changedKeys(r) {
+    if (!r.current) return Object.keys(r.tags);
+    return Object.keys(r.tags).filter((k) => r.current[k] !== r.tags[k]);
+  }
+
+  function isNoChange(r) {
+    if (r.type !== "modify") return false;
+    if (r.status) return r.status === "unchanged";
+    return !!r.current && changedKeys(r).length === 0;
+  }
+
+  // Fetch the existing objects of all modify rows (in the page world, via iD)
+  // and remember their current tags for the old → new display.
+  function loadExisting(list) {
+    const ids = Array.from(new Set(list.map((r) => r.osmId)));
+    if (!ids.length) return Promise.resolve();
+    return request("ost-load-entities", { ids }, 30000).then((res) => {
+      for (const r of list) {
+        const x = res.results[r.osmId];
+        r.current = x && x.ok ? x.tags : null;
+        r.loadError = x && !x.ok ? x.error : null;
+      }
+    });
+  }
+
+  function modifyRows(list) {
+    return list.filter((r) => !r.error && r.type === "modify");
   }
 
   function updatePreview(zoom) {
@@ -229,7 +296,7 @@
     const list = checkedRows();
     const geojson = {
       type: "FeatureCollection",
-      features: list.map((r) => ({
+      features: list.filter((r) => r.coords.length).map((r) => ({
         type: "Feature",
         id: "csv-line-" + r.line,
         properties: Object.assign({}, r.tags),
@@ -263,6 +330,16 @@
     renderList();
     if (ok) updatePreview(true);
     else clearPreview();
+
+    const mods = modifyRows(rows);
+    if (mods.length) {
+      const loadedFor = rows;
+      loadExisting(mods)
+        .then(() => {
+          if (rows === loadedFor && !imported) renderList();
+        })
+        .catch((e) => setStatus("Bestehende Objekte konnten nicht geladen werden: " + e.message, true));
+    }
   }
 
   function doImport() {
@@ -273,24 +350,53 @@
       return;
     }
     importBtn.disabled = true;
-    const items = list.map((r) => ({ type: r.type, coords: r.coords, closed: r.closed, tags: r.tags }));
-    clearPreview()
+    const items = list.map((r) =>
+      r.type === "modify"
+        ? { type: "modify", id: r.osmId, tags: r.tags }
+        : { type: r.type, coords: r.coords, closed: r.closed, tags: r.tags }
+    );
+    const mods = modifyRows(list);
+    if (mods.length) setStatus(`Lade ${mods.length} bestehende${mods.length === 1 ? "s" : ""} Objekt(e)…`, false);
+    loadExisting(mods)
+      .then(clearPreview)
       .then(() =>
-        request("ost-import-entities", {
-          items,
-          annotation: `CSV-Import: ${items.length} Objekt${items.length === 1 ? "" : "e"}`
-        })
+        request("ost-import-entities", { items })
       )
       .then((res) => {
-        list.forEach((r, i) => (r.id = res.ids[i]));
+        const count = { created: 0, changed: 0, unchanged: 0, missing: 0 };
+        list.forEach((r, i) => {
+          const x = res.results[i];
+          count[x.status]++;
+          if (r.type === "modify") {
+            r.status = x.status;
+            if (x.status === "missing") {
+              r.error = `${osmRefLabel(r.osmId)} ${r.loadError || "nicht ladbar"} — übersprungen`;
+            } else {
+              r.id = x.id;
+            }
+          } else {
+            r.id = x.id;
+          }
+        });
         imported = true;
+        const parts = [];
+        if (count.created) parts.push(`${count.created} angelegt`);
+        if (count.changed) parts.push(`${count.changed} geändert`);
+        if (count.unchanged) parts.push(`${count.unchanged} ohne Änderung`);
+        if (count.missing) parts.push(`${count.missing} nicht ladbar`);
+        const applied = count.created + count.changed;
         setStatus(
-          `${list.length} Objekt${list.length === 1 ? "" : "e"} angelegt (Strg+Z macht alles rückgängig). ` +
-            "Klick auf einen Eintrag wählt ihn zur Prüfung aus; hochladen wie gewohnt über „Speichern“.",
-          false
+          (parts.join(", ") || "Nichts zu tun") +
+            "." +
+            (applied
+              ? " Strg+Z macht alles rückgängig. Klick auf einen Eintrag wählt ihn zur Prüfung aus; " +
+                "hochladen wie gewohnt über „Speichern“."
+              : ""),
+          count.missing > 0
         );
         renderList();
-        request("ost-focus", { ids: list.map((r) => r.id) }).catch(() => {});
+        const reviewIds = reviewableIds();
+        if (reviewIds.length) request("ost-focus", { ids: reviewIds }).catch(() => {});
       })
       .catch((e) => {
         setStatus("Import fehlgeschlagen: " + e.message, true);
@@ -308,8 +414,20 @@
     clearPreview();
   }
 
+  // Ids of everything this import created or changed.
+  function reviewableIds() {
+    return rows.filter((r) => r.id && r.status !== "unchanged").map((r) => r.id);
+  }
+
   function focusRow(r) {
-    const payload = r.id ? { ids: [r.id] } : { bbox: bboxOf([r]) };
+    let payload;
+    if (r.id) payload = { ids: [r.id] };
+    else if (r.type === "modify" && r.current) payload = { ids: [r.osmId], select: false };
+    else if (r.coords.length) payload = { bbox: bboxOf([r]) };
+    else {
+      setStatus(`${osmRefLabel(r.osmId)} ist noch nicht geladen und hat keine Koordinate.`, true);
+      return;
+    }
     request("ost-focus", payload).catch((e) => setStatus(e.message, true));
   }
 
@@ -330,17 +448,49 @@
     return t.name ? `${t.name} (${main})` : main;
   }
 
+  function modifyLabel(r) {
+    const ref = osmRefLabel(r.osmId);
+    if (r.status === "unchanged" || (!r.status && isNoChange(r))) return `${ref}: keine Änderung`;
+    const keys = changedKeys(r);
+    const parts = keys.map((k) => {
+      const old = r.current && r.current[k];
+      return old ? `${k}: ${old} → ${r.tags[k]}` : `${k}=${r.tags[k]}`;
+    });
+    return `ändert ${ref}: ${parts.join(", ")}`;
+  }
+
+  function modifyTitle(r) {
+    const lines = Object.keys(r.tags).map((k) => {
+      const old = r.current ? r.current[k] : undefined;
+      if (!r.current) return `${k}=${r.tags[k]}`;
+      if (old === r.tags[k]) return `${k}=${old} (unverändert)`;
+      return old ? `${k}: ${old} → ${r.tags[k]}` : `${k}=${r.tags[k]} (neu)`;
+    });
+    let state;
+    if (r.current) state = "geladen";
+    else if (r.loadError) state = `nicht ladbar: ${r.loadError}`;
+    else state = "noch nicht geladen";
+    return `Zeile ${r.line} · ändert ${osmRefLabel(r.osmId)} (${state})\n` + lines.join("\n");
+  }
+
   function renderList() {
     if (!listEl) return;
     listEl.textContent = "";
     for (const r of rows) {
       const li = document.createElement("li");
-      li.className = "ost-csv-row" + (r.error ? " ost-csv-row-error" : "") + (r.id ? " ost-csv-row-done" : "");
+      const noChange = isNoChange(r);
+      li.className =
+        "ost-csv-row" +
+        (r.error ? " ost-csv-row-error" : "") +
+        (r.id && !noChange ? " ost-csv-row-done" : "") +
+        (r.type === "modify" ? " ost-csv-row-modify" : "") +
+        (noChange ? " ost-csv-row-same" : "") +
+        (r.loadError && !r.error ? " ost-csv-row-warn" : "");
 
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.checked = r.checked;
-      cb.disabled = !!r.error || imported;
+      cb.checked = r.checked && !noChange && !r.error;
+      cb.disabled = !!r.error || imported || noChange;
       cb.title = "In den Import aufnehmen";
       cb.addEventListener("change", () => {
         r.checked = cb.checked;
@@ -350,7 +500,9 @@
 
       const kind = document.createElement("span");
       kind.className = "ost-csv-kind";
-      kind.textContent = r.type === "node" ? "N" : r.closed ? "A" : r.type === "way" ? "W" : "?";
+      kind.textContent =
+        r.type === "modify" ? "Ä" : r.type === "node" ? "N" : r.closed ? "A" : r.type === "way" ? "W" : "?";
+      if (r.type === "modify") kind.title = "Ändert ein bestehendes Objekt";
 
       const text = document.createElement("button");
       text.type = "button";
@@ -358,6 +510,12 @@
       if (r.error) {
         text.textContent = `Zeile ${r.line}: ${r.error}`;
         text.disabled = true;
+      } else if (r.type === "modify") {
+        text.textContent = modifyLabel(r) + (r.loadError ? ` (${r.loadError})` : "");
+        text.title =
+          modifyTitle(r) +
+          (imported && !r.id ? "\n(nicht angewendet)" : "\n\nKlick: dorthin zoomen" + (r.id ? " und auswählen" : ""));
+        text.addEventListener("click", () => focusRow(r));
       } else {
         text.textContent = rowLabel(r);
         text.title =
@@ -414,7 +572,7 @@
     controlEl.className = "map-control ost-csv-map-control";
     controlEl.id = CONTROL_ID;
     controlEl.innerHTML =
-      '<button type="button" title="CSV-Import — Punkte/Linien aus einer CSV anlegen" aria-label="CSV-Import">' +
+      '<button type="button" title="CSV-Import — Objekte aus einer CSV anlegen oder ändern" aria-label="CSV-Import">' +
       tableIconSvg() +
       "</button>";
     controlsWrap.appendChild(controlEl);
@@ -467,7 +625,7 @@
     importBtn.addEventListener("click", doImport);
     discardBtn.addEventListener("click", discard);
     selectAllBtn.addEventListener("click", () => {
-      const ids = rows.filter((r) => r.id).map((r) => r.id);
+      const ids = reviewableIds();
       if (ids.length) request("ost-focus", { ids }).catch((e) => setStatus(e.message, true));
     });
 

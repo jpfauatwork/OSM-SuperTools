@@ -429,9 +429,74 @@
     }
   }
 
-  // CsvImport: create tagged nodes and ways in one undo step. Nodes are
-  // [lon, lat] with optional tags; ways reference node indices. Returns the new
-  // entity ids per payload item so the pane can jump to them for review.
+  // CsvImport: make sure existing OSM objects (n123 / w123 / r123) are in the
+  // graph. Already present ones are answered straight away, the rest are fetched
+  // in parallel via context.loadEntity with a per-object timeout. Objects deleted
+  // in the current edit session count as missing. Replies with the current tags
+  // per id, or an error text.
+  var LOAD_TIMEOUT_MS = 12000;
+
+  function loadOne(id) {
+    return new Promise(function (resolve) {
+      var history = ctx.history && ctx.history();
+      if (ctx.hasEntity(id)) {
+        resolve({ ok: true, tags: Object.assign({}, ctx.entity(id).tags) });
+        return;
+      }
+      if (history && history.base().hasEntity(id)) {
+        resolve({ ok: false, error: "in dieser Sitzung gelöscht" });
+        return;
+      }
+      if (typeof ctx.loadEntity !== "function") {
+        resolve({ ok: false, error: "Nachladen nicht möglich" });
+        return;
+      }
+      var settled = false;
+      var calls = 0;
+      var lastErr = null;
+      function finish(res) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(res);
+      }
+      var timer = setTimeout(function () {
+        finish({ ok: false, error: "Zeitüberschreitung beim Laden" });
+      }, LOAD_TIMEOUT_MS);
+      // loadEntity calls back twice: the object itself and its parent relations.
+      ctx.loadEntity(id, function (err) {
+        calls++;
+        if (err) lastErr = err;
+        if (ctx.hasEntity(id)) {
+          finish({ ok: true, tags: Object.assign({}, ctx.entity(id).tags) });
+        } else if (calls >= 2 || (err && (err.status === 404 || err.status === 410))) {
+          var st = lastErr && lastErr.status;
+          finish({
+            ok: false,
+            error: st === 410 ? "auf OSM gelöscht" : st === 404 ? "existiert nicht" : "nicht ladbar"
+          });
+        }
+      });
+    });
+  }
+
+  function handleLoadEntities(reqId, payload) {
+    if (!ctx) {
+      reply(reqId, false, { error: "iD-Kontext nicht verfügbar" });
+      return;
+    }
+    var ids = (payload && payload.ids) || [];
+    Promise.all(ids.map(loadOne)).then(function (list) {
+      var results = {};
+      ids.forEach(function (id, i) { results[id] = list[i]; });
+      reply(reqId, true, { results: results });
+    });
+  }
+
+  // CsvImport: create tagged nodes and ways and change tags on existing objects,
+  // all in one undo step. Nodes are [lon, lat]; "modify" items carry an iD id
+  // (n123/w123/r123) whose tags are set/overwritten, other tags stay. Returns a
+  // result per payload item: { id, status: created|changed|unchanged|missing }.
   function handleImportEntities(reqId, payload) {
     try {
       if (!ctx) throw new Error("iD-Kontext nicht verfügbar");
@@ -443,11 +508,21 @@
         throw new Error("Ungültige Nutzdaten");
       }
       var ents = [];
-      var ids = payload.items.map(function (item) {
+      var changes = [];
+      var graphNow = ctx.graph();
+      var results = payload.items.map(function (item) {
+        if (item.type === "modify") {
+          if (!graphNow.hasEntity(item.id)) return { id: item.id, status: "missing" };
+          var cur = graphNow.entity(item.id).tags || {};
+          var diff = Object.keys(item.tags || {}).filter(function (k) { return cur[k] !== item.tags[k]; });
+          if (!diff.length) return { id: item.id, status: "unchanged" };
+          changes.push({ id: item.id, tags: Object.assign({}, cur, item.tags) });
+          return { id: item.id, status: "changed" };
+        }
         if (item.type === "node") {
           var n = new iD.osmNode({ loc: [item.coords[0][0], item.coords[0][1]], tags: item.tags || {} });
           ents.push(n);
-          return n.id;
+          return { id: n.id, status: "created" };
         }
         var nodeIds = item.coords.map(function (ll) {
           var vn = new iD.osmNode({ loc: [ll[0], ll[1]] });
@@ -457,14 +532,29 @@
         if (item.closed) nodeIds.push(nodeIds[0]);
         var w = new iD.osmWay({ nodes: nodeIds, tags: item.tags || {} });
         ents.push(w);
-        return w.id;
+        return { id: w.id, status: "created" };
       });
-      ctx.perform(function (graph) {
-        for (var i = 0; i < ents.length; i++) graph = graph.replace(ents[i]);
-        return graph;
-      }, payload.annotation || "Import CSV");
-      log("csv import:", ids.length, "feature(s)");
-      reply(reqId, true, { ids: ids });
+      if (ents.length || changes.length) {
+        var nNew = results.filter(function (r) { return r.status === "created"; }).length;
+        var annotation =
+          "CSV-Import: " +
+          [nNew ? nNew + " neu" : "", changes.length ? changes.length + " geändert" : ""]
+            .filter(Boolean)
+            .join(", ");
+        var changeTags = iD.actionChangeTags;
+        ctx.perform(function (graph) {
+          for (var i = 0; i < ents.length; i++) graph = graph.replace(ents[i]);
+          for (var j = 0; j < changes.length; j++) {
+            var c = changes[j];
+            graph = typeof changeTags === "function"
+              ? changeTags(c.id, c.tags)(graph)
+              : graph.replace(graph.entity(c.id).update({ tags: c.tags }));
+          }
+          return graph;
+        }, annotation);
+      }
+      log("csv import:", ents.length, "new entities,", changes.length, "changed");
+      reply(reqId, true, { results: results });
     } catch (e) {
       log("import failed:", e && e.message);
       reply(reqId, false, { error: (e && e.message) || String(e) });
@@ -491,7 +581,9 @@
         .map(function (e) { return e.extent(g); })
         .reduce(function (a, b) { return a.extend(b); });
       ctx.map().zoomToEase(ext.padByMeters(40));
-      if (iD && typeof iD.modeSelect === "function") ctx.enter(iD.modeSelect(ctx, present));
+      if (payload.select !== false && iD && typeof iD.modeSelect === "function") {
+        ctx.enter(iD.modeSelect(ctx, present));
+      }
       reply(reqId, true, { found: present.length });
     } catch (e) {
       reply(reqId, false, { error: (e && e.message) || String(e) });
@@ -542,6 +634,8 @@
       handleSetTags(d.reqId, d.payload);
     } else if (d.__ost === "ost-import-entities") {
       handleImportEntities(d.reqId, d.payload);
+    } else if (d.__ost === "ost-load-entities") {
+      handleLoadEntities(d.reqId, d.payload);
     } else if (d.__ost === "ost-focus") {
       handleFocus(d.reqId, d.payload);
     } else if (d.__ost === "ost-preview") {

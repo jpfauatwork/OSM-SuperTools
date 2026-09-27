@@ -59,14 +59,15 @@ iD's native menu items (paste, copy, delete, …) stay in place — the ALKIS it
 **Attribution / licence:** ALKIS is © GeoBasis-DE/LGLN, provided under CC BY 4.0 with **explicit permission for OSM use** ([DE:Niedersachsen/Geoportal](https://wiki.openstreetmap.org/wiki/DE:Niedersachsen/Geoportal)). Attribution is satisfied via the OSM [Contributors list](https://wiki.openstreetmap.org/wiki/Contributors), so no per-object `source` tag is needed. If you want one anyway, set `SOURCE_TAG` in `modules/alkisimport.js` (e.g. `© GeoBasis-DE/LGLN 2025`).
 
 ### CsvImport
-Add points, lines and areas from a CSV list — for example one that another tool or an AI generated for you. Available from the map controls (table icon, next to Overlays).
+Add points, lines and areas — and add or overwrite tags on existing OSM objects by their ID — from a CSV list, for example one that a mapping app, another tool or an AI generated for you. Available from the map controls (table icon, next to Overlays).
 
 **How to use it:**
 
 1. Open the **CSV-Import** pane and either pick a `.csv` file or paste the CSV into the text box and click **Einlesen**.
 2. Every row is listed with its line number. Rows with errors are shown in red with the reason and are skipped. All valid rows are drawn as a preview on iD's *Custom Map Data* layer and the map zooms to them; clicking an entry zooms to that one. Untick entries you don't want.
-3. Click **Importieren (N)**. The ticked rows are created as new, editable OSM features in **one undo step** (`Ctrl+Z` removes them all). Nothing is uploaded yet.
-4. Review: clicking an entry now selects that feature in iD (**Alle auswählen** selects all of them). Fix what needs fixing, then upload with iD's normal **Save**.
+   Rows that change an existing object (orange **Ä**, "ändert way/123") fetch that object from OSM right away and then show what changes, e.g. `building: house → garage`. A row whose tags are already set exactly like that is greyed out as **keine Änderung** and not applied; an object that can't be loaded (deleted, doesn't exist) is flagged.
+3. Click **Importieren (N)**. Existing objects that aren't loaded yet are fetched first, then all ticked rows — **new and changed** objects — are applied in **one undo step** (`Ctrl+Z` reverts all of it). Objects that can't be loaded are marked as errors and skipped, the rest still goes through. Nothing is uploaded yet.
+4. Review: clicking an entry now selects that feature in iD (**Alle auswählen** selects everything that was created or changed). Fix what needs fixing, then upload with iD's normal **Save**.
 
 The preview temporarily takes over iD's Custom Map Data layer and clears it again on import/discard (its previous on/off state is restored). Imported features are not snapped to existing geometry — check that ways connect where they should.
 
@@ -75,19 +76,23 @@ The preview temporarily takes over iD's Custom Map Data layer and clears it agai
 Copy the block below and hand it to whoever (or whatever) produces the file:
 
 ```text
-OSM SuperTools CSV import format (v1)
+OSM SuperTools CSV import format
 
 Encoding: UTF-8. One OSM feature per line. Fields are separated by a semicolon ";".
+A line either CREATES a new object or UPDATES the tags of an existing one.
 
 Line layout:
   <type>;<coordinates>;<key>=<value>;<key>=<value>;...
 
 1. <type> — one of:
+   New objects:
      node  a single point (alias: point)
      way   an open line, e.g. a path or fence (alias: line)
      area  a closed way/polygon, e.g. a building or pitch; it is closed
            automatically, do NOT repeat the first coordinate
-   (A "way" whose first and last coordinate are identical is also treated as closed.)
+     (A "way" whose first and last coordinate are identical is also treated as closed.)
+   Existing objects (update line) — OSM type, a slash, and the object's ID:
+     node/<id>, way/<id>, relation/<id>      e.g. way/459668590
 
 2. <coordinates> — WGS84 decimal degrees, LATITUDE FIRST: "lat,lon"
    (like Google Maps), dot as decimal separator, no spaces inside a pair.
@@ -95,10 +100,17 @@ Line layout:
      way:  two or more pairs, separated by a single space
                                        52.37589,9.73201 52.37612,9.73255
      area: three or more pairs, in order around the outline
+     update line: OPTIONAL — leave the field empty, or give exactly one pair
+                  (e.g. a point on the object); it is only used for the
+                  preview and to zoom there, never to move the object.
    Use at least 6 decimal places for building-level accuracy.
 
 3. Tags — every remaining field is exactly one OSM tag "key=value"
    (split at the first "="; the value may itself contain "=").
+   - An update line works like a PATCH, not a PUT: only the listed tags are
+     touched — a key the object already has gets the new value, a new key is
+     added, and all other tags of the object stay as they are. Tags cannot be
+     removed.
    - At least one tag per line. Each key at most once per line.
    - Use normal OSM tagging (https://wiki.openstreetmap.org/wiki/Map_features).
    - Keys and values max. 255 characters, no empty values.
@@ -118,6 +130,9 @@ node;52.376120,9.732550;amenity=waste_basket
 node;52.376300,9.731800;"opening_hours=Mo-Fr 07:00-18:00; Sa 08:00-12:00";shop=bakery;name=Bäckerei Müller
 way;52.375800,9.731900 52.376000,9.732300 52.376200,9.732600;highway=footway;surface=asphalt
 area;52.37640,9.73300 52.37640,9.73330 52.37625,9.73330 52.37625,9.73300;leisure=pitch;sport=basketball
+# update lines: existing objects by type/ID, coordinate optional
+way/459668590;53.2875966,9.8616184;building=garage;capacity=2;roof:shape=flat
+node/14220693625;;lamp_type=electric
 ```
 
 ## Install

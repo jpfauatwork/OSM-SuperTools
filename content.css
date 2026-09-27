@@ -796,3 +796,24 @@
   flex-direction: column;
   gap: 6px;
 }
+
+.ost-csv-row-modify .ost-csv-kind {
+  background: #e0a030;
+}
+
+.ost-csv-row-modify.ost-csv-row-done .ost-csv-kind {
+  background: #4caf72;
+}
+
+.ost-csv-pane .ost-csv-row-same .ost-csv-text {
+  color: var(--muted-text-color, #aaa);
+  font-style: italic;
+}
+
+.ost-csv-pane .ost-csv-row-warn .ost-csv-text {
+  color: #e0a030;
+}
+
+.ost-csv-row-modify.ost-csv-row-error .ost-csv-kind {
+  background: #e06c6c;
+}
