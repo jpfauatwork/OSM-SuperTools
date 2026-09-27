@@ -656,3 +656,143 @@
 #ost-dir-toast.ost-dir-toast-error {
   background: rgba(120, 30, 30, 0.94);
 }
+
+/* ---- CsvImport ---------------------------------------------------------- */
+
+#ost-csv-control > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ost-csv-pane .ost-csv-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-color, #333);
+  padding: 0 4px;
+}
+
+.ost-csv-upload,
+.ost-csv-pane .ost-csv-btn {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  border: none;
+  background: var(--link-color, #7092ff);
+  color: #fff;
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  height: auto;
+}
+
+.ost-csv-upload:hover,
+.ost-csv-pane .ost-csv-btn:hover:not(:disabled) {
+  background: var(--link-focus-color, #597be7);
+}
+
+.ost-csv-pane .ost-csv-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ost-csv-pane .ost-csv-btn[hidden] {
+  display: none;
+}
+
+.ost-csv-pane .ost-csv-text-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 6px;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+
+.ost-csv-status {
+  margin: 8px 0;
+  min-height: 13px;
+  font-size: 11px;
+  color: var(--muted-text-color, #aaa);
+}
+
+.ost-csv-status.ost-csv-error {
+  color: #e06c6c;
+}
+
+.ost-csv-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.ost-csv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.ost-csv-row input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+}
+
+.ost-csv-kind {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: #7092ff;
+}
+
+.ost-csv-row-done .ost-csv-kind {
+  background: #4caf72;
+}
+
+.ost-csv-row-error .ost-csv-kind {
+  background: #e06c6c;
+}
+
+.ost-csv-pane .ost-csv-row .ost-csv-text {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-color, #333);
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ost-csv-pane .ost-csv-row .ost-csv-text:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.ost-csv-pane .ost-csv-row-error .ost-csv-text {
+  color: #e06c6c;
+  white-space: normal;
+  cursor: default;
+}
+
+.ost-csv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

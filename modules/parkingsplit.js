@@ -782,7 +782,7 @@
   }
 
   function buildModeButton(joined) {
-    if (document.getElementById(CONTROL_ID)) return;
+    if (!OST.claimControl([CONTROL_ID], controlEl)) return;
     controlEl = document.createElement("button");
     controlEl.type = "button";
     controlEl.id = CONTROL_ID;

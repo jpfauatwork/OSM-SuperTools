@@ -9,6 +9,8 @@
   let listEl = null;
   let paneEl = null;
   let controlEl = null;
+  let paneCtl = null;
+  let pendingEchoes = 0;
 
   function log(...args) {
     console.log("[OSM SuperTools/QuickFilters]", ...args);
@@ -83,7 +85,7 @@
     const counts = {};
     active.forEach((f) => (counts[f.id] = new Set()));
     if (active.length === 0) {
-      renderList();
+      updateCounts();
       return;
     }
 
@@ -104,7 +106,20 @@
     }
 
     for (const f of active) f._count = counts[f.id] ? counts[f.id].size : 0;
-    renderList();
+    updateCounts();
+  }
+
+  // Only touch the count text. Rebuilding the list here (as it used to) fed
+  // back into the MutationObserver and re-created the checkboxes every
+  // ~150 ms, so clicks landing between mousedown and mouseup got lost.
+  function updateCounts() {
+    if (!listEl) return;
+    for (const f of filters) {
+      const el = listEl.querySelector('.ost-qf-count[data-id="' + CSS.escape(String(f.id)) + '"]');
+      if (!el) continue;
+      const text = f.enabled && typeof f._count === "number" ? String(f._count) : "";
+      if (el.textContent !== text) el.textContent = text;
+    }
   }
 
   function hasCriteria(f) {
@@ -123,7 +138,7 @@
   }
 
   function buildControl(controlsWrap, panesWrap) {
-    if (document.getElementById(CONTROL_ID)) return;
+    if (!OST.claimControl([CONTROL_ID, PANE_ID], controlEl)) return;
 
     controlEl = document.createElement("div");
     controlEl.className = "map-control ost-qf-map-control";
@@ -151,28 +166,15 @@
 
     listEl = paneEl.querySelector(".ost-qf-list");
 
-    controlEl.querySelector("button").addEventListener("click", togglePane);
-    paneEl.querySelector(".ost-qf-close").addEventListener("click", () => setPaneShown(false));
+    paneCtl = OST.registerMapPane(paneEl, controlEl.querySelector("button"));
+    controlEl.querySelector("button").addEventListener("click", () => paneCtl.toggle());
+    paneEl.querySelector(".ost-qf-close").addEventListener("click", () => paneCtl.setShown(false));
     paneEl.querySelector(".ost-qf-manage").addEventListener("click", () => {
       browser.runtime.sendMessage({ type: "open-options", focus: "quickfilters" });
     });
 
     renderList();
     log("control ready");
-  }
-
-  function setPaneShown(shown) {
-    if (!paneEl) return;
-    paneEl.classList.toggle("hide", !shown);
-    paneEl.classList.toggle("shown", shown);
-
-    const btn = controlEl && controlEl.querySelector("button");
-    if (btn) btn.classList.toggle("active", shown);
-  }
-
-  function togglePane() {
-    if (!paneEl) return;
-    setPaneShown(paneEl.classList.contains("hide"));
   }
 
   function renderList() {
@@ -214,6 +216,7 @@
 
       const count = document.createElement("span");
       count.className = "ost-qf-count";
+      count.dataset.id = String(f.id);
       count.textContent = f.enabled && typeof f._count === "number" ? String(f._count) : "";
 
       li.append(label, count);
@@ -231,6 +234,7 @@
       present: f.present,
       absent: f.absent
     }));
+    pendingEchoes++;
     browser.storage.local.set({ filters: toStore });
   }
 
@@ -256,6 +260,11 @@
 
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.filters) return;
+    // Our own checkbox toggle echoing back — the list is already up to date.
+    if (pendingEchoes > 0) {
+      pendingEchoes--;
+      return;
+    }
 
     filters = (changes.filters.newValue || []).map(normalizeFilter);
     renderList();
@@ -275,7 +284,9 @@
 
   let applyScheduled = false;
   function observe() {
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      // Our own pane changing (e.g. count text) must not re-trigger a pass.
+      if (paneEl && mutations.every((m) => paneEl.contains(m.target))) return;
       if (!placeScheduled) {
         placeScheduled = true;
         requestAnimationFrame(() => {

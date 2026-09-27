@@ -21,6 +21,7 @@
   let layerGroup = null;
   let observer = null;
   let legendLi = null;
+  let paneCtl = null;
 
   let pendingEchoes = 0;
 
@@ -547,7 +548,7 @@
   }
 
   function buildControl(controlsWrap, panesWrap) {
-    if (document.getElementById(CONTROL_ID)) return;
+    if (!OST.claimControl([CONTROL_ID, PANE_ID], controlEl)) return;
 
     controlEl = document.createElement("div");
     controlEl.className = "map-control ost-ov-map-control";
@@ -579,8 +580,9 @@
     listEl = paneEl.querySelector(".ost-ov-list");
     statusEl = paneEl.querySelector(".ost-ov-status");
 
-    controlEl.querySelector("button").addEventListener("click", togglePane);
-    paneEl.querySelector(".ost-ov-close").addEventListener("click", () => setPaneShown(false));
+    paneCtl = OST.registerMapPane(paneEl, controlEl.querySelector("button"));
+    controlEl.querySelector("button").addEventListener("click", () => paneCtl.toggle());
+    paneEl.querySelector(".ost-ov-close").addEventListener("click", () => paneCtl.setShown(false));
     const fileInput = paneEl.querySelector('input[type="file"]');
     fileInput.addEventListener("change", () => {
       handleFiles(fileInput.files);
@@ -589,19 +591,6 @@
 
     renderList();
     log("control ready");
-  }
-
-  function setPaneShown(shown) {
-    if (!paneEl) return;
-    paneEl.classList.toggle("hide", !shown);
-    paneEl.classList.toggle("shown", shown);
-    const btn = controlEl && controlEl.querySelector("button");
-    if (btn) btn.classList.toggle("active", shown);
-  }
-
-  function togglePane() {
-    if (!paneEl) return;
-    setPaneShown(paneEl.classList.contains("hide"));
   }
 
   function renderList() {

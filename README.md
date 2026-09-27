@@ -58,6 +58,68 @@ iD's native menu items (paste, copy, delete, …) stay in place — the ALKIS it
 
 **Attribution / licence:** ALKIS is © GeoBasis-DE/LGLN, provided under CC BY 4.0 with **explicit permission for OSM use** ([DE:Niedersachsen/Geoportal](https://wiki.openstreetmap.org/wiki/DE:Niedersachsen/Geoportal)). Attribution is satisfied via the OSM [Contributors list](https://wiki.openstreetmap.org/wiki/Contributors), so no per-object `source` tag is needed. If you want one anyway, set `SOURCE_TAG` in `modules/alkisimport.js` (e.g. `© GeoBasis-DE/LGLN 2025`).
 
+### CsvImport
+Add points, lines and areas from a CSV list — for example one that another tool or an AI generated for you. Available from the map controls (table icon, next to Overlays).
+
+**How to use it:**
+
+1. Open the **CSV-Import** pane and either pick a `.csv` file or paste the CSV into the text box and click **Einlesen**.
+2. Every row is listed with its line number. Rows with errors are shown in red with the reason and are skipped. All valid rows are drawn as a preview on iD's *Custom Map Data* layer and the map zooms to them; clicking an entry zooms to that one. Untick entries you don't want.
+3. Click **Importieren (N)**. The ticked rows are created as new, editable OSM features in **one undo step** (`Ctrl+Z` removes them all). Nothing is uploaded yet.
+4. Review: clicking an entry now selects that feature in iD (**Alle auswählen** selects all of them). Fix what needs fixing, then upload with iD's normal **Save**.
+
+The preview temporarily takes over iD's Custom Map Data layer and clears it again on import/discard (its previous on/off state is restored). Imported features are not snapped to existing geometry — check that ways connect where they should.
+
+#### CSV format
+
+Copy the block below and hand it to whoever (or whatever) produces the file:
+
+```text
+OSM SuperTools CSV import format (v1)
+
+Encoding: UTF-8. One OSM feature per line. Fields are separated by a semicolon ";".
+
+Line layout:
+  <type>;<coordinates>;<key>=<value>;<key>=<value>;...
+
+1. <type> — one of:
+     node  a single point (alias: point)
+     way   an open line, e.g. a path or fence (alias: line)
+     area  a closed way/polygon, e.g. a building or pitch; it is closed
+           automatically, do NOT repeat the first coordinate
+   (A "way" whose first and last coordinate are identical is also treated as closed.)
+
+2. <coordinates> — WGS84 decimal degrees, LATITUDE FIRST: "lat,lon"
+   (like Google Maps), dot as decimal separator, no spaces inside a pair.
+     node: exactly one pair            52.375892,9.732010
+     way:  two or more pairs, separated by a single space
+                                       52.37589,9.73201 52.37612,9.73255
+     area: three or more pairs, in order around the outline
+   Use at least 6 decimal places for building-level accuracy.
+
+3. Tags — every remaining field is exactly one OSM tag "key=value"
+   (split at the first "="; the value may itself contain "=").
+   - At least one tag per line. Each key at most once per line.
+   - Use normal OSM tagging (https://wiki.openstreetmap.org/wiki/Map_features).
+   - Keys and values max. 255 characters, no empty values.
+   - If a tag contains ";" or starts with a double quote, wrap the whole
+     field in double quotes and double any quote inside it:
+       "opening_hours=Mo-Fr 08:00-18:00; Sa 09:00-13:00"
+       "name=Gasthaus ""Zum Anker"""
+
+Optional: lines starting with "#" are comments; a first line starting with
+"type" is treated as a header and ignored; empty lines are ignored.
+Output only the CSV — no Markdown code fences, no explanations.
+
+Example:
+type;coordinates;tags
+node;52.375892,9.732010;amenity=bench;backrest=yes;material=wood
+node;52.376120,9.732550;amenity=waste_basket
+node;52.376300,9.731800;"opening_hours=Mo-Fr 07:00-18:00; Sa 08:00-12:00";shop=bakery;name=Bäckerei Müller
+way;52.375800,9.731900 52.376000,9.732300 52.376200,9.732600;highway=footway;surface=asphalt
+area;52.37640,9.73300 52.37640,9.73330 52.37625,9.73330 52.37625,9.73300;leisure=pitch;sport=basketball
+```
+
 ## Install
 
 Requires **Firefox 128 or newer**.

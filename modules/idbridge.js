@@ -429,6 +429,107 @@
     }
   }
 
+  // CsvImport: create tagged nodes and ways in one undo step. Nodes are
+  // [lon, lat] with optional tags; ways reference node indices. Returns the new
+  // entity ids per payload item so the pane can jump to them for review.
+  function handleImportEntities(reqId, payload) {
+    try {
+      if (!ctx) throw new Error("iD-Kontext nicht verfügbar");
+      var iD = realID;
+      if (!iD || typeof iD.osmNode !== "function" || typeof iD.osmWay !== "function") {
+        throw new Error("iD-Entity-Konstruktoren fehlen");
+      }
+      if (!payload || !Array.isArray(payload.items) || !payload.items.length) {
+        throw new Error("Ungültige Nutzdaten");
+      }
+      var ents = [];
+      var ids = payload.items.map(function (item) {
+        if (item.type === "node") {
+          var n = new iD.osmNode({ loc: [item.coords[0][0], item.coords[0][1]], tags: item.tags || {} });
+          ents.push(n);
+          return n.id;
+        }
+        var nodeIds = item.coords.map(function (ll) {
+          var vn = new iD.osmNode({ loc: [ll[0], ll[1]] });
+          ents.push(vn);
+          return vn.id;
+        });
+        if (item.closed) nodeIds.push(nodeIds[0]);
+        var w = new iD.osmWay({ nodes: nodeIds, tags: item.tags || {} });
+        ents.push(w);
+        return w.id;
+      });
+      ctx.perform(function (graph) {
+        for (var i = 0; i < ents.length; i++) graph = graph.replace(ents[i]);
+        return graph;
+      }, payload.annotation || "Import CSV");
+      log("csv import:", ids.length, "feature(s)");
+      reply(reqId, true, { ids: ids });
+    } catch (e) {
+      log("import failed:", e && e.message);
+      reply(reqId, false, { error: (e && e.message) || String(e) });
+    }
+  }
+
+  // Select entities (review) and ease the map to them. Ids that no longer
+  // exist (undone, deleted) are skipped.
+  function handleFocus(reqId, payload) {
+    try {
+      if (!ctx) throw new Error("iD-Kontext nicht verfügbar");
+      var iD = realID;
+      if (payload && payload.bbox && !payload.ids) {
+        var b = payload.bbox;
+        ctx.map().zoomToEase(iD.geoExtent([b[0], b[1]], [b[2], b[3]]).padByMeters(40));
+        reply(reqId, true, {});
+        return;
+      }
+      var g = ctx.graph();
+      var present = (payload && payload.ids || []).filter(function (id) { return g.hasEntity(id); });
+      if (!present.length) throw new Error("Objekt nicht (mehr) vorhanden");
+      var ents = present.map(function (id) { return g.entity(id); });
+      var ext = ents
+        .map(function (e) { return e.extent(g); })
+        .reduce(function (a, b) { return a.extend(b); });
+      ctx.map().zoomToEase(ext.padByMeters(40));
+      if (iD && typeof iD.modeSelect === "function") ctx.enter(iD.modeSelect(ctx, present));
+      reply(reqId, true, { found: present.length });
+    } catch (e) {
+      reply(reqId, false, { error: (e && e.message) || String(e) });
+    }
+  }
+
+  // Preview parsed CSV rows on iD's own "Custom Map Data" layer. Only a preview
+  // we put there is ever cleared, and the layer's previous on/off state is
+  // restored afterwards.
+  var PREVIEW_SRC = "OSM SuperTools CSV-Vorschau";
+  var previewPrevEnabled = null;
+
+  function handlePreview(reqId, payload) {
+    try {
+      if (!ctx) throw new Error("iD-Kontext nicht verfügbar");
+      var layer = ctx.layers && ctx.layers().layer("data");
+      if (!layer) throw new Error("Datenebene nicht verfügbar");
+      var iD = realID;
+      var gj = payload && payload.geojson;
+      if (gj && gj.features && gj.features.length) {
+        if (previewPrevEnabled === null) previewPrevEnabled = !!layer.enabled();
+        layer.geojson(gj, PREVIEW_SRC);
+        layer.enabled(true);
+        if (payload.bbox && iD && typeof iD.geoExtent === "function") {
+          var b = payload.bbox;
+          ctx.map().zoomToEase(iD.geoExtent([b[0], b[1]], [b[2], b[3]]).padByMeters(40));
+        }
+      } else if (previewPrevEnabled !== null) {
+        layer.geojson({});
+        layer.enabled(previewPrevEnabled);
+        previewPrevEnabled = null;
+      }
+      reply(reqId, true, {});
+    } catch (e) {
+      reply(reqId, false, { error: (e && e.message) || String(e) });
+    }
+  }
+
   window.addEventListener("message", function (ev) {
     if (ev.source !== window || ev.origin !== ORIGIN) return;
     var d = ev.data;
@@ -439,6 +540,12 @@
       handleAddFeatures(d.reqId, d.payload);
     } else if (d.__ost === "ost-set-tags") {
       handleSetTags(d.reqId, d.payload);
+    } else if (d.__ost === "ost-import-entities") {
+      handleImportEntities(d.reqId, d.payload);
+    } else if (d.__ost === "ost-focus") {
+      handleFocus(d.reqId, d.payload);
+    } else if (d.__ost === "ost-preview") {
+      handlePreview(d.reqId, d.payload);
     }
   });
 
