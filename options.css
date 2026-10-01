@@ -243,3 +243,17 @@ input[type="color"] {
     color: #f2f3f5;
   }
 }
+
+#ost-overpass-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.ost-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: #c2410c;
+}
+
+.ost-hint:empty {
+  display: none;
+}

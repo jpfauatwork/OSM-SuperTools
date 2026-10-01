@@ -26,6 +26,17 @@
       <button type="button" id="ost-add-filter" class="ost-btn ost-btn-secondary">+ Add filter</button>
     </section>
 
+    <section class="ost-module" id="module-overpasssearch">
+      <h2 class="ost-module-title">OverpassSearch</h2>
+      <p class="ost-module-desc">A bar at the bottom of the map (magnifier icon in the map controls): run an Overpass query and step through the results with ◀ / ▶ or F3 / Shift+F3. There is <strong>no default instance</strong> — pick one deliberately, and respect its usage policy. On save, Firefox asks for permission to contact that host.</p>
+
+      <div class="ost-field-row">
+        <label class="ost-field-label" for="ost-overpass-url">Overpass API URL</label>
+        <input type="text" id="ost-overpass-url" placeholder="https://…/api/interpreter" spellcheck="false" />
+      </div>
+      <p class="ost-hint" id="ost-overpass-hint"></p>
+    </section>
+
     <div class="ost-actions">
       <button type="button" id="ost-save" class="ost-btn ost-btn-primary">Save</button>
       <span id="ost-saved" class="ost-saved"></span>

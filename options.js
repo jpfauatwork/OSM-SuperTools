@@ -4,6 +4,8 @@ const addButtonBtn = document.getElementById("ost-add-button");
 const addFilterBtn = document.getElementById("ost-add-filter");
 const saveBtn = document.getElementById("ost-save");
 const savedEl = document.getElementById("ost-saved");
+const overpassUrlEl = document.getElementById("ost-overpass-url");
+const overpassHintEl = document.getElementById("ost-overpass-hint");
 
 let buttons = [];
 let filters = [];
@@ -223,7 +225,28 @@ addFilterBtn.addEventListener("click", () => {
   renderFilters();
 });
 
+// Origin pattern for the Overpass URL, or null when empty/invalid.
+function overpassOrigin(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.origin + "/*";
+  } catch (e) {
+    return null;
+  }
+}
+
 saveBtn.addEventListener("click", async () => {
+  // permissions.request must run synchronously inside the click, before any await.
+  // The bare API root answers 404 — queries go to …/api/interpreter.
+  const overpassUrl = overpassUrlEl.value.trim().replace(/\/api\/?$/, "/api/interpreter");
+  overpassUrlEl.value = overpassUrl;
+  const origin = overpassOrigin(overpassUrl);
+  const permission = origin ? browser.permissions.request({ origins: [origin] }) : Promise.resolve(true);
+  overpassHintEl.textContent =
+    overpassUrl && !origin ? "Not a valid http(s) URL — OverpassSearch stays disabled." : "";
+
   syncButtonsFromDom();
   syncFiltersFromDom();
 
@@ -244,13 +267,22 @@ saveBtn.addEventListener("click", async () => {
     absent: f.absent.filter((t) => t.key)
   }));
 
-  await browser.storage.local.set({ buttons: buttonsToStore, filters: filtersToStore });
+  await browser.storage.local.set({
+    buttons: buttonsToStore,
+    filters: filtersToStore,
+    overpassUrl: origin ? overpassUrl : ""
+  });
+  if (origin && !(await permission.catch(() => false))) {
+    overpassHintEl.textContent =
+      "Permission for this host was not granted — queries only work if the instance allows cross-origin requests.";
+  }
   savedEl.textContent = "Saved";
   setTimeout(() => (savedEl.textContent = ""), 2000);
 });
 
 (async function init() {
-  const stored = await browser.storage.local.get(["buttons", "filters"]);
+  const stored = await browser.storage.local.get(["buttons", "filters", "overpassUrl"]);
+  overpassUrlEl.value = stored.overpassUrl || "";
   buttons = (Array.isArray(stored.buttons) ? stored.buttons : []).map(normalizeButton);
   filters = (Array.isArray(stored.filters) ? stored.filters : []).map(normalizeFilter);
   renderButtons();

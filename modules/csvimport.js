@@ -140,16 +140,14 @@
 
       let coords;
       if (type === "modify") {
-        // Coordinate is optional here and only used for preview/zoom.
+        // The object is identified by its ID alone; anything in the
+        // coordinate field is ignored (no preview point, no zoom target).
         row.type = "modify";
         row.osmId = osmId;
         row.current = null;
         row.loadError = null;
         row.status = null;
-        coords = fields.length > 1 && fields[1].trim() ? parseCoords(fields[1]) : [];
-        if (coords.length > 1) {
-          throw new Error(`Änderungszeile erlaubt höchstens 1 Koordinate, hat ${coords.length}`);
-        }
+        coords = [];
       } else {
         if (fields.length < 2 || !fields[1].trim()) throw new Error("Koordinaten fehlen");
         coords = parseCoords(fields[1]);
@@ -236,7 +234,7 @@
 
   function rowGeometry(r) {
     const ll = r.coords.map((c) => [c[0], c[1]]);
-    if (r.type === "node" || r.type === "modify") return { type: "Point", coordinates: ll[0] };
+    if (r.type === "node") return { type: "Point", coordinates: ll[0] };
     if (r.closed) return { type: "Polygon", coordinates: [ll.concat([ll[0]])] };
     return { type: "LineString", coordinates: ll };
   }
@@ -425,7 +423,7 @@
     else if (r.type === "modify" && r.current) payload = { ids: [r.osmId], select: false };
     else if (r.coords.length) payload = { bbox: bboxOf([r]) };
     else {
-      setStatus(`${osmRefLabel(r.osmId)} ist noch nicht geladen und hat keine Koordinate.`, true);
+      setStatus(`${osmRefLabel(r.osmId)} ist noch nicht geladen.`, true);
       return;
     }
     request("ost-focus", payload).catch((e) => setStatus(e.message, true));

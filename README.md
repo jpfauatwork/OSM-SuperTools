@@ -65,7 +65,7 @@ Add points, lines and areas — and add or overwrite tags on existing OSM object
 
 1. Open the **CSV-Import** pane and either pick a `.csv` file or paste the CSV into the text box and click **Einlesen**.
 2. Every row is listed with its line number. Rows with errors are shown in red with the reason and are skipped. All valid rows are drawn as a preview on iD's *Custom Map Data* layer and the map zooms to them; clicking an entry zooms to that one. Untick entries you don't want.
-   Rows that change an existing object (orange **Ä**, "ändert way/123") fetch that object from OSM right away and then show what changes, e.g. `building: house → garage`. A row whose tags are already set exactly like that is greyed out as **keine Änderung** and not applied; an object that can't be loaded (deleted, doesn't exist) is flagged.
+   Rows that change an existing object (orange **Ä**, "ändert way/123") fetch that object from OSM right away and then show what changes, e.g. `building: house → garage`. They are identified by their ID only — no preview point is drawn; clicking one zooms to the loaded object. A row whose tags are already set exactly like that is greyed out as **keine Änderung** and not applied; an object that can't be loaded (deleted, doesn't exist) is flagged.
 3. Click **Importieren (N)**. Existing objects that aren't loaded yet are fetched first, then all ticked rows — **new and changed** objects — are applied in **one undo step** (`Ctrl+Z` reverts all of it). Objects that can't be loaded are marked as errors and skipped, the rest still goes through. Nothing is uploaded yet.
 4. Review: clicking an entry now selects that feature in iD (**Alle auswählen** selects everything that was created or changed). Fix what needs fixing, then upload with iD's normal **Save**.
 
@@ -100,9 +100,9 @@ Line layout:
      way:  two or more pairs, separated by a single space
                                        52.37589,9.73201 52.37612,9.73255
      area: three or more pairs, in order around the outline
-     update line: OPTIONAL — leave the field empty, or give exactly one pair
-                  (e.g. a point on the object); it is only used for the
-                  preview and to zoom there, never to move the object.
+     update line: leave the field EMPTY ("way/123;;key=value"). The object
+                  is identified by its type/ID alone; anything in this
+                  field is ignored.
    Use at least 6 decimal places for building-level accuracy.
 
 3. Tags — every remaining field is exactly one OSM tag "key=value"
@@ -130,10 +130,25 @@ node;52.376120,9.732550;amenity=waste_basket
 node;52.376300,9.731800;"opening_hours=Mo-Fr 07:00-18:00; Sa 08:00-12:00";shop=bakery;name=Bäckerei Müller
 way;52.375800,9.731900 52.376000,9.732300 52.376200,9.732600;highway=footway;surface=asphalt
 area;52.37640,9.73300 52.37640,9.73330 52.37625,9.73330 52.37625,9.73300;leisure=pitch;sport=basketball
-# update lines: existing objects by type/ID, coordinate optional
-way/459668590;53.2875966,9.8616184;building=garage;capacity=2;roof:shape=flat
+# update lines: existing objects by type/ID, coordinate field empty
+way/459668590;;building=garage;capacity=2;roof:shape=flat
 node/14220693625;;lamp_type=electric
 ```
+
+### OverpassSearch
+Work through the results of an Overpass query one by one — e.g. all buildings in view that have no address yet. Available from the map controls (magnifier icon); it opens a slim bar at the bottom of the map instead of a sidebar pane.
+
+**Setup:** enter an Overpass API URL (e.g. `https://…/api/interpreter`) under **OverpassSearch** in the settings. There is deliberately **no default instance** — choose one consciously and respect its usage policy. Until one is set, the bar makes no requests and links to the settings. On save, Firefox asks for permission to contact that host.
+
+**How to use it:**
+
+1. Type a query and press **Enter** (Shift+Enter = new line), e.g. `nwr[building][!"addr:housenumber"]({{bbox}});`
+   - `{{bbox}}` is replaced by the current map view.
+   - `[out:json]` is added (or forced) and, if the query has no `out` statement, `out tags center;` is appended — so the bare filter is enough.
+2. The map jumps straight to the first result: the object is loaded from OSM if needed, zoomed to and selected, so you can edit it right away.
+3. Step on with **▶** / **◀** — or **F3** / **Shift+F3**, which also works while you are typing in iD's tag editor. The counter shows `3 / 57`; clicking the label jumps back to the current object. It wraps around at the end.
+
+The query, the result list and the position are kept across editor reloads. Closing the bar (**×**) keeps them too. Results are a snapshot from the time of the query — objects you've fixed stay in the list.
 
 ## Install
 
@@ -148,7 +163,7 @@ Firefox removes temporary add-ons on restart, so you'll need to reload it from `
 
 ## Configuration
 
-Click the gear icon next to the language button in the osm.org header (or the gear inside the QuickTagging panel) to open Settings, where you can add, edit, and remove QuickTagging buttons and QuickFilters. AddressFill needs no configuration.
+Click the gear icon next to the language button in the osm.org header (or the gear inside the QuickTagging panel) to open Settings, where you can add, edit, and remove QuickTagging buttons and QuickFilters, and set the Overpass instance for OverpassSearch. AddressFill needs no configuration.
 
 ## Building a release
 

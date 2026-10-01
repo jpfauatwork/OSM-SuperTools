@@ -590,6 +590,55 @@
     }
   }
 
+  // OverpassSearch: current map view as [west, south, east, north] for {{bbox}}.
+  function handleMapExtent(reqId) {
+    try {
+      if (!ctx) throw new Error("iD-Kontext nicht verfügbar");
+      var ext = ctx.map().extent();
+      reply(reqId, true, { bbox: [ext[0][0], ext[0][1], ext[1][0], ext[1][1]] });
+    } catch (e) {
+      reply(reqId, false, { error: (e && e.message) || String(e) });
+    }
+  }
+
+  // OverpassSearch: load one object (fetching it from OSM if it isn't in the
+  // graph yet), zoom to it and select it. Only the most recent request acts —
+  // stepping quickly through results must not end on a stale selection.
+  var gotoSeq = 0;
+
+  function handleGotoEntity(reqId, payload) {
+    if (!ctx) {
+      reply(reqId, false, { error: "iD-Kontext nicht verfügbar" });
+      return;
+    }
+    var id = payload && payload.id;
+    if (!/^[nwr]\d+$/.test(id || "")) {
+      reply(reqId, false, { error: "Ungültige ID" });
+      return;
+    }
+    var mySeq = ++gotoSeq;
+    loadOne(id).then(function (res) {
+      if (mySeq !== gotoSeq) {
+        reply(reqId, true, { stale: true });
+        return;
+      }
+      if (!res.ok) {
+        reply(reqId, false, { error: res.error });
+        return;
+      }
+      try {
+        var iD = realID;
+        var g = ctx.graph();
+        var ent = g.entity(id);
+        ctx.map().zoomToEase(ent.extent(g).padByMeters(40));
+        if (iD && typeof iD.modeSelect === "function") ctx.enter(iD.modeSelect(ctx, [id]));
+        reply(reqId, true, {});
+      } catch (e) {
+        reply(reqId, false, { error: (e && e.message) || String(e) });
+      }
+    });
+  }
+
   // Preview parsed CSV rows on iD's own "Custom Map Data" layer. Only a preview
   // we put there is ever cleared, and the layer's previous on/off state is
   // restored afterwards.
@@ -640,6 +689,10 @@
       handleFocus(d.reqId, d.payload);
     } else if (d.__ost === "ost-preview") {
       handlePreview(d.reqId, d.payload);
+    } else if (d.__ost === "ost-map-extent") {
+      handleMapExtent(d.reqId);
+    } else if (d.__ost === "ost-goto-entity") {
+      handleGotoEntity(d.reqId, d.payload);
     }
   });
 

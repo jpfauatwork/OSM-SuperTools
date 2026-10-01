@@ -98,15 +98,14 @@
   color: #e06c6c;
 }
 
-.surface .ost-qf-match {
+/* Outline only: iD draws areas twice (path.area.fill in the fill layer,
+   path.area.stroke in the stroke layer). Leave the fill layer untouched so
+   the interior keeps its normal rendering (e.g. to judge roof colours on
+   imagery) and only recolour the outline. */
+.surface .ost-qf-match:not(.fill) {
   stroke: var(--ost-qf-color, #ff2d95) !important;
-  stroke-width: 5px !important;
+  stroke-width: 4px !important;
   stroke-opacity: 0.95 !important;
-}
-
-.surface path.area.ost-qf-match {
-  fill: var(--ost-qf-color, #ff2d95) !important;
-  fill-opacity: 0.25 !important;
 }
 
 .surface g.point.ost-qf-match path.stroke,
@@ -816,4 +815,137 @@
 
 .ost-csv-row-modify.ost-csv-row-error .ost-csv-kind {
   background: #e06c6c;
+}
+
+/* ---- OverpassSearch ----------------------------------------------------- */
+
+#ost-ovp-control > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Slim bar floating at the bottom centre of the map, above iD's footer. */
+.ost-ovp-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: min(720px, calc(100% - 140px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--fill-color, #fff);
+  border: 1px solid var(--border-color, #ccc);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  color: var(--text-color, #333);
+  pointer-events: auto;
+  font-size: 12px;
+}
+
+.ost-ovp-bar[hidden],
+.ost-ovp-bar [hidden] {
+  display: none !important;
+}
+
+.ost-ovp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ost-ovp-bar .ost-ovp-query {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: none;
+  height: 30px;
+  min-height: 30px;
+  padding: 5px 8px;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 3px;
+}
+
+.ost-ovp-bar .ost-ovp-btn {
+  flex: none;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 3px;
+  background: var(--link-color, #7092ff);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ost-ovp-bar .ost-ovp-btn:hover:not(:disabled) {
+  background: var(--link-focus-color, #597be7);
+}
+
+.ost-ovp-bar .ost-ovp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ost-ovp-bar .ost-ovp-close {
+  flex: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-color, #333);
+  padding: 0 4px;
+}
+
+.ost-ovp-counter {
+  flex: none;
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: bold;
+}
+
+.ost-ovp-bar .ost-ovp-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  height: 30px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ost-ovp-bar .ost-ovp-label:hover {
+  text-decoration: underline;
+}
+
+.ost-ovp-bar .ost-ovp-label.ost-ovp-loading {
+  opacity: 0.55;
+}
+
+.ost-ovp-status {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted-text-color, #777);
+}
+
+.ost-ovp-status.ost-ovp-error {
+  color: #c0392b;
+}
+
+.ost-ovp-status-row:has(.ost-ovp-status[hidden]):has(.ost-ovp-settings[hidden]) {
+  display: none;
 }

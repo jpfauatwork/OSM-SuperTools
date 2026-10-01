@@ -57,3 +57,30 @@ browser.runtime.onMessage.addListener((message) => {
     .then(async (r) => ({ ok: r.ok, status: r.status, text: await r.text() }))
     .catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
 });
+
+// "https://host/api/" → "https://host/api/interpreter": the bare API root
+// answers 404, queries go to the interpreter endpoint.
+function overpassEndpoint(url) {
+  return url.replace(/\/api\/?$/, "/api/interpreter");
+}
+
+// OverpassSearch runs its query here against the instance the user entered in
+// the settings. There is intentionally no default instance: nobody's public
+// server gets load unless the user picked it on purpose.
+browser.runtime.onMessage.addListener((message) => {
+  if (!message || message.type !== "overpass-query" || typeof message.query !== "string") return;
+  return browser.storage.local
+    .get("overpassUrl")
+    .then(async ({ overpassUrl }) => {
+      const url = overpassEndpoint(String(overpassUrl || "").trim());
+      if (!url) return { ok: false, error: "no-instance" };
+      if (!/^https?:\/\//i.test(url)) return { ok: false, error: "Overpass-URL muss mit http(s):// beginnen" };
+      const r = await fetch(url, {
+        method: "POST",
+        body: new URLSearchParams({ data: message.query }),
+        credentials: "omit"
+      });
+      return { ok: r.ok, status: r.status, text: await r.text(), url };
+    })
+    .catch((e) => ({ ok: false, error: "Anfrage fehlgeschlagen: " + String((e && e.message) || e) }));
+});
